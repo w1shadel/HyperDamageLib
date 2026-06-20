@@ -52,8 +52,28 @@ public class DecayClientSetup {
                                 .smokeLifetime(2000L)
                                 .build()
                 );
+                DecayItemAnimationRegistry.register(ModItems.VOID_SHRED_SWORD.get(),
+                        DecayAnimationConfig.builder()
+                                .animator((poseStack, displayContext, stack, time) -> {
+                                    double elapsedSeconds = (time % 3600000L) / 1000.0;
+
+                                    float pulse = (float) (Math.sin(elapsedSeconds * 4.0) * 0.04);
+                                    poseStack.scale(1.0F + pulse, 1.0F - pulse, 1.0F + pulse);
+                                })
+                                .aura(true)
+                                .auraColor(80, 0, 110, 190) 
+                                .auraScale(0.38F)
+                                .auraRotateSpeed(55.0F) 
+                                .auraPulse(0.4F, 0.08F)
+                                .auraShape(DecayAnimationConfig.AuraShape.BLACK_HOLE)
+                                .smoke(true)
+                                .smokeDensity(8)
+                                .smokeSize(0.8F)
+                                .smokeLifetime(1600L)
+                                .build()
+                );
             } catch (Exception e) {
-                HDL.LOGGER.error("[HDL-DEBUG] Failed to register EROSION_SWORD animator", e);
+                HDL.LOGGER.error("[HDL-DEBUG] Failed to register animator", e);
             }
         });
     }

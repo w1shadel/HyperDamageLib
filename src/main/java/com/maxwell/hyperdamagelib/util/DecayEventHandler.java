@@ -43,7 +43,21 @@ public class DecayEventHandler {
             }
         }
     }
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void onLivingHeal(net.minecraftforge.event.entity.living.LivingHealEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide()) return;
 
+        if (entity instanceof IDecayEntity decay) {
+            float decayAmount = decay.getDecayAmount();
+            if (decayAmount > 0.0F) {
+                float healAmount = event.getAmount();
+                float reductionRatio = 0.5F;
+                float reduction = healAmount * reductionRatio;
+                decay.setDecayAmount(Math.max(0.0F, decayAmount - reduction));
+            }
+        }
+    }
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void enforceDecayDeath(net.minecraftforge.event.entity.living.LivingDeathEvent event) {
         if (event.getEntity() instanceof IDecayEntity decayEntity) {

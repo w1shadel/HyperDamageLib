@@ -2,6 +2,7 @@ package com.maxwell.hyperdamagelib.init;
 
 import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.item.ErosionSwordItem;
+import com.maxwell.hyperdamagelib.item.VoidShredSwordItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraftforge.registries.DeferredRegister;
@@ -12,5 +13,8 @@ public class ModItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, HDL.MODID);
     public static final RegistryObject<Item> EROSION_SWORD = ITEMS.register("erosion_sword", () ->
             new ErosionSwordItem(new Item.Properties().rarity(Rarity.EPIC).fireResistant())
+    );
+    public static final RegistryObject<Item> VOID_SHRED_SWORD = ITEMS.register("void_shred_sword", () ->
+            new VoidShredSwordItem(new Item.Properties().rarity(Rarity.EPIC).fireResistant())
     );
 }

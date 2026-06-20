@@ -106,9 +106,10 @@ public class ErosionSwordItem extends SwordItem {
                             entity -> entity.isAlive() && !entity.isSpectator()
                     );
                     DamageSource erosionSource = DecayDamageUtil.getErosionSource(level, player);
+                    DamageSource voidShredSource = DecayDamageUtil.getVoidShredSource(level, player);
                     boolean hitAny = false;
                     for (LivingEntity target : targets) {
-                        target.hurt(erosionSource, 10.0F);
+                        target.hurt(voidShredSource, 10.0F);
                         if (level instanceof ServerLevel serverLevel) {
                             serverLevel.sendParticles(
                                     ParticleTypes.SOUL,

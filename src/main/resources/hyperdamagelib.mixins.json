@@ -16,6 +16,8 @@
     "client.MinecraftMixin",
     "client.ClientPacketListenerMixin",
     "client.ItemRendererMixin",
+    "client.PostChainAccessor",
+    "client.PostPassAccessor",
     "client.ItemTransformMixin"
   ],
   "injectors": {
