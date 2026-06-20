@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/handheld",
+  "textures": {
+    "layer0": "hyperdamagelib:item/erosion_sword"
+  }
+}

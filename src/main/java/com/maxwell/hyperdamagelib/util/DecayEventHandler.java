@@ -1,11 +1,9 @@
 package com.maxwell.hyperdamagelib.util;
 
-
 import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.item.ErosionSwordItem;
-import com.maxwell.hyperdamagelib.network.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.network.ModMessages;
-
+import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -62,26 +60,24 @@ public class DecayEventHandler {
             }
         }
     }
+
     @SubscribeEvent
     public static void onItemPickup(EntityItemPickupEvent event) {
         Player player = event.getEntity();
         if (player instanceof ServerPlayer serverPlayer) {
-
-
             if (serverPlayer.connection == null) {
                 event.setCanceled(true);
             }
         }
     }
+
     @SubscribeEvent
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity.level().isClientSide()) return;
-
         if (entity instanceof ServerPlayer player && player.connection == null) {
             return;
         }
-
         if (entity instanceof IDecayEntity decay) {
             int hold = decay.getDecayHoldTicks();
             if (hold > 0) {
@@ -101,6 +97,7 @@ public class DecayEventHandler {
             }
         }
     }
+
     @SubscribeEvent
     public static void onItemUseFinish(net.minecraftforge.event.entity.living.LivingEntityUseItemEvent.Finish event) {
         if (event.getEntity() instanceof Player player && player instanceof IDecayEntity decay) {
@@ -111,6 +108,7 @@ public class DecayEventHandler {
             }
         }
     }
+
     @SubscribeEvent
     public static void onPlayerClone(PlayerEvent.Clone event) {
         Player newPlayer = event.getEntity();

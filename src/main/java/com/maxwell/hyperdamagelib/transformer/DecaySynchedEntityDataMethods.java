@@ -26,7 +26,8 @@ public class DecaySynchedEntityDataMethods {
                 try {
                     entityField = clazz.getDeclaredField("f_135344_");
                     DecayUnsafeHelper.forceSetAccessible(entityField);
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
             }
             initialized = true;
         }
@@ -45,29 +46,23 @@ public class DecaySynchedEntityDataMethods {
             initField(data.getClass());
         }
         if (entityField == null) return value;
-
         try {
             Entity entity = (Entity) entityField.get(data);
             if (entity == null || entity.level().isClientSide()) {
                 return value;
             }
-
             if (entity instanceof IDecayEntity decayEntity && entity instanceof LivingEntity living) {
                 if (decayEntity.isSuperInvincible()) {
-
                     if (accessor.equals(LivingEntityAccessor.getDataHealthId())) {
                         if (value instanceof Float) {
                             return Float.valueOf(living.getMaxHealth());
                         }
                     }
 
-
-
-
                 }
             }
-        } catch (Throwable ignored) {}
-
+        } catch (Throwable ignored) {
+        }
         return value;
     }
 }

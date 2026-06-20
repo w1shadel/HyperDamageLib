@@ -18,8 +18,6 @@ import java.util.List;
 import java.util.Objects;
 
 public class DecayForceKillHelper {
-
-
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
         breakBrain(entity);
@@ -39,6 +37,7 @@ public class DecayForceKillHelper {
             removeFromMemory(entity);
         }
     }
+
     public static void breakBrain(LivingEntity entity) {
         entity.getBrain().clearMemories();
         if (entity instanceof Mob mob) {
@@ -76,28 +75,20 @@ public class DecayForceKillHelper {
         }
     }
 
-    
     public static void removeFromMemory(Entity victim) {
         Level level = victim.level();
         if (level instanceof ServerLevel serverLevel) {
-
             PersistentEntitySectionManager<Entity> entityManager = serverLevel.entityManager;
-
             victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
             victim.levelCallback = EntityInLevelCallback.NULL;
-
             removeFromPersistentEntityManager(entityManager, victim);
-
             serverLevel.getChunkSource().removeEntity(victim);
         }
     }
 
-    
     @SuppressWarnings("unchecked")
     public static void removeFromPersistentEntityManager(PersistentEntitySectionManager<Entity> manager, Entity victim) {
-
         EntitySectionStorage<Entity> sectionStorage = manager.sectionStorage;
-
         if (manager.isLoaded(victim.getUUID())) {
             long index = SectionPos.of(victim.blockPosition()).asLong();
             EntitySection<Entity> tSection = sectionStorage.getSection(index);
@@ -109,16 +100,12 @@ public class DecayForceKillHelper {
                 for (Entity entity : entities) {
                     newSection.add(entity);
                 }
-
                 sectionStorage.sections.replace(index, newSection);
             }
-
             manager.knownUuids.remove(victim.getUUID());
         }
-
         EntityLookup<Entity> entityLookup = manager.visibleEntityStorage;
         entityLookup.remove(victim);
-
         if (entityLookup.getEntity(victim.getId()) != null) {
             EntityLookup<Entity> newEntityLookup = new EntityLookup<>();
             for (Entity entity : entityLookup.getAllEntities()) {

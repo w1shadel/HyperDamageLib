@@ -22,4 +22,10 @@ public interface LivingEntityAccessor {
 
     @Invoker("dropAllDeathLoot")
     void invokeDropAllDeathLoot(DamageSource source);
+
+    @Invoker("getDamageAfterArmorAbsorb")
+    float invokeGetDamageAfterArmorAbsorb(DamageSource source, float amount);
+
+    @Invoker("getDamageAfterMagicAbsorb")
+    float invokeGetDamageAfterMagicAbsorb(DamageSource source, float amount);
 }

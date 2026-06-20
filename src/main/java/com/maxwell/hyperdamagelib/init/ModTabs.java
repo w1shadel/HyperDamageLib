@@ -1,6 +1,5 @@
 package com.maxwell.hyperdamagelib.init;
 
-
 import com.maxwell.hyperdamagelib.HDL;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;

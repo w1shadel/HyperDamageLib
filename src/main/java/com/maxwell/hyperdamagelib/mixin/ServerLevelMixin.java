@@ -1,6 +1,5 @@
 package com.maxwell.hyperdamagelib.mixin;
 
-
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;

@@ -2,7 +2,7 @@ package com.maxwell.hyperdamagelib.mixin;
 
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
-import com.maxwell.hyperdamagelib.network.ClientboundDecaySyncPacket;
+import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.DecayForceKillHelper;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
@@ -23,6 +23,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Debug(export = true)
 @Mixin(value = LivingEntity.class, priority = -10000000)
 public abstract class LivingEntityMixin implements IDecayEntity {
+    @Shadow
+    protected boolean dead;
+    @Shadow
+    protected int deathTime;
     @Unique
     private float decayAmount = 0.0f;
     @Unique
@@ -31,11 +35,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private boolean superInvincible = false;
     @Unique
     private boolean decayRemoveBypass = false;
+    @Unique
+    private int decayHoldTicks;
 
-    @Shadow protected boolean dead;
-    @Shadow protected int deathTime;
-    @Unique private int decayHoldTicks;
-    
     @Unique
     private boolean csp$isLoginIncomplete() {
         LivingEntity self = (LivingEntity) (Object) this;
@@ -44,6 +46,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         return self.tickCount <= 0;
     }
+
     @Override
     public int getDecayHoldTicks() {
         return this.decayHoldTicks;
@@ -53,28 +56,31 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     public void setDecayHoldTicks(int ticks) {
         this.decayHoldTicks = ticks;
     }
+
     @Override
     public float getDecayAmount() {
         return this.decayAmount;
     }
 
     @Override
-    public boolean isSuperInvincible() {
-        return this.superInvincible;
-    }
-    @Override
-    public void addDecayAmount(float amount) {
-        this.decayAmount = Math.max(0.0f, this.decayAmount + amount);
-        this.decayHoldTicks = 100;
-    }
-    @Override
-    public boolean isRemoveBypass() {
-        return this.decayRemoveBypass;
+    public void setDecayAmount(float amount) {
+        LivingEntity self = (LivingEntity) (Object) this;
+        this.decayAmount = Math.max(0.0f, Math.min(amount, self.getMaxHealth()));
+        float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
+        if (self.getHealth() > cappedMax) {
+            try {
+                DecayDamageUtil.BYPASS_DECAY.set(true);
+                self.setHealth(cappedMax);
+            } finally {
+                DecayDamageUtil.BYPASS_DECAY.remove();
+            }
+        }
+        csp$syncToTracking();
     }
 
     @Override
-    public void setRemoveBypass(boolean val) {
-        this.decayRemoveBypass = val;
+    public boolean isSuperInvincible() {
+        return this.superInvincible;
     }
 
     @Override
@@ -89,29 +95,29 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Override
+    public void addDecayAmount(float amount) {
+        this.decayAmount = Math.max(0.0f, this.decayAmount + amount);
+        this.decayHoldTicks = 100;
+    }
+
+    @Override
+    public boolean isRemoveBypass() {
+        return this.decayRemoveBypass;
+    }
+
+    @Override
+    public void setRemoveBypass(boolean val) {
+        this.decayRemoveBypass = val;
+    }
+
+    @Override
     public void subtractTrueHP(float amount) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) return;
-
         DamageSource erosionSource = DecayDamageUtil.getErosionSource(self.level(), null);
         self.hurt(erosionSource, amount);
     }
 
-    @Override
-    public void setDecayAmount(float amount) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        this.decayAmount = Math.max(0.0f, Math.min(amount, self.getMaxHealth()));
-        float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
-        if (self.getHealth() > cappedMax) {
-            try {
-                DecayDamageUtil.BYPASS_DECAY.set(true);
-                self.setHealth(cappedMax);
-            } finally {
-               DecayDamageUtil.BYPASS_DECAY.remove();
-            }
-        }
-        csp$syncToTracking();
-    }
     @Unique
     private void csp$syncToTracking() {
         LivingEntity self = (LivingEntity) (Object) this;
@@ -136,7 +142,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             ci.cancel();
             return;
         }
-
         if (this.superInvincible) {
             ci.cancel();
         }
@@ -150,7 +155,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             }
             return value;
         }
-
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
             return self.getMaxHealth();
@@ -214,13 +218,11 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             return;
         }
         LivingEntity self = (LivingEntity) (Object) this;
-
         if (this.superInvincible) {
             this.dead = false;
             this.deathTime = 0;
             self.setHealth(self.getMaxHealth());
         }
-
         if (!self.level().isClientSide() && this.decayAmount >= self.getMaxHealth()) {
             if (!this.decayDeathTriggered && !self.dead) {
                 this.decayDeathTriggered = true;
@@ -244,9 +246,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             this.superInvincible = nbt.getBoolean("super_invincible");
         }
     }
+
     @Inject(method = "dropAllDeathLoot", at = @At("HEAD"), cancellable = true)
     private void csp$preventDropAllDeathLoot(DamageSource source, CallbackInfo ci) {
-
         if (this.superInvincible) {
             ci.cancel();
         }

@@ -1,4 +1,4 @@
-package com.maxwell.hyperdamagelib.network;
+package com.maxwell.hyperdamagelib.network.client;
 
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.client.Minecraft;

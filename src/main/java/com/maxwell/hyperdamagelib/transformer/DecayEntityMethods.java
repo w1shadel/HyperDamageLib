@@ -3,14 +3,11 @@ package com.maxwell.hyperdamagelib.transformer;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.server.level.ServerPlayer;
 
 public class DecayEntityMethods {
-
-
-
     public static boolean shouldReplaceHealthMethod(Entity entity) {
         if (entity instanceof LivingEntity living && entity instanceof IDecayEntity decay) {
             return decay.isSuperInvincible() || decay.getDecayAmount() > 0.0F;
@@ -23,7 +20,6 @@ public class DecayEntityMethods {
             if (decay.isSuperInvincible()) {
                 return livingEntity.getMaxHealth();
             }
-
             float cappedHealth = livingEntity.getMaxHealth() - decay.getDecayAmount();
             return Math.max(-Float.MAX_VALUE, cappedHealth);
         }
@@ -43,6 +39,7 @@ public class DecayEntityMethods {
         }
         return health;
     }
+
     public static boolean replaceIsDeadOrDying(Entity entity) {
         if (entity instanceof LivingEntity living && entity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) return false;
@@ -139,48 +136,59 @@ public class DecayEntityMethods {
 
     public static boolean handleForceDamage(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (target instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-            return true; 
+            return true;
         }
-
         if (DecayDamageUtil.shouldApplyBypass(source)) {
             if (target instanceof IDecayEntity decayTarget) {
-
-
                 decayTarget.addDecayAmount(amount);
                 return true;
             }
         }
         return false;
     }
+
     public static boolean handleForceDie(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
         if (self instanceof IDecayEntity decay) {
-
             if (decay.getDecayAmount() >= self.getMaxHealth() && !decay.isSuperInvincible()) {
-
                 if (!self.level().isClientSide()) {
                     ((LivingEntityAccessor) self).setDeadFlag(true);
                     self.deathTime = 1;
                     ((LivingEntityAccessor) self).invokeDropAllDeathLoot(source);
-
                     if (self instanceof ServerPlayer player) {
                         player.awardStat(net.minecraft.stats.Stats.DEATHS);
                         player.getCombatTracker().recheckStatus();
                         net.minecraft.network.chat.Component deathMsg = player.getCombatTracker().getDeathMessage();
-
                         player.connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerCombatKillPacket(player.getId(), deathMsg));
                     }
                 }
-
                 self.level().broadcastEntityEvent(self, (byte) 3);
-
-                return true; 
+                return true;
             }
         }
         return false;
     }
+
     public static boolean handleForceActuallyHurt(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (target instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
+        }
+        if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.VOID_SHRED)) {
+            if (target instanceof com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor accessor) {
+                float afterArmor = accessor.invokeGetDamageAfterArmorAbsorb(source, amount);
+                float afterMagic = accessor.invokeGetDamageAfterMagicAbsorb(source, afterArmor);
+                float finalDamage = Math.max(1.0F, afterMagic);
+                float absorption = target.getAbsorptionAmount();
+                if (absorption > 0.0F) {
+                    float absorptionDamage = Math.min(absorption, finalDamage);
+                    target.setAbsorptionAmount(absorption - absorptionDamage);
+                    finalDamage -= absorptionDamage;
+                }
+                if (finalDamage > 0.0F) {
+                    target.getCombatTracker().recordDamage(source, finalDamage);
+                    target.setHealth(target.getHealth() - finalDamage);
+                }
+                return true;
+            }
         }
         if (DecayDamageUtil.shouldApplyBypass(source)) {
             if (target instanceof IDecayEntity decayTarget) {

@@ -16,13 +16,13 @@ public abstract class ServerPlayerMixin {
         ServerPlayer player = (ServerPlayer) (Object) this;
         return player.connection == null;
     }
+
     @Inject(method = "die", at = @At("HEAD"), cancellable = true)
     private void csp$preventServerPlayerDie(DamageSource source, CallbackInfo ci) {
         if (csp$isLoginIncomplete()) {
             ci.cancel();
             return;
         }
-
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             ci.cancel();
         }

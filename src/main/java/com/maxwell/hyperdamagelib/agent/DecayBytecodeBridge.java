@@ -9,7 +9,8 @@ public final class DecayBytecodeBridge {
     private static final Logger LOGGER = Logger.getLogger("DecayBytecodeBridge");
     public static volatile BiFunction<Optional<byte[]>, String, Optional<byte[]>> transformer;
 
-    private DecayBytecodeBridge() {}
+    private DecayBytecodeBridge() {
+    }
 
     public static Optional<byte[]> transformOptionalBytes(Optional<byte[]> bytes, String className) {
         BiFunction<Optional<byte[]>, String, Optional<byte[]>> t = transformer;

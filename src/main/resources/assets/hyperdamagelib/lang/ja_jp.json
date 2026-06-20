@@ -1,4 +1,6 @@
 {
   "creative_tab.hyperdamagelib.prime_tab": "HyperDamageLibrary",
-  "item.hyperdamagelib.erosion_sword": "殲滅の剣"
+  "item.hyperdamagelib.erosion_sword": "殲滅の剣",
+  "death.attack.void_shred": "%1$sは空間の裂け目に切り刻まれた。",
+  "death.attack.erosion": "%1$sは消滅した。"
 }

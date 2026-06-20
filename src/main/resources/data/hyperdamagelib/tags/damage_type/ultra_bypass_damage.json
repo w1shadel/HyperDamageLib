@@ -1,6 +1,6 @@
 {
   "values": [
-    "cataclysm_primed_soul:erosion",
-    "cataclysm_primed_soul:true_void"
+    "hyperdamagelib:erosion",
+    "hyperdamagelib:void_shred"
   ]
 }

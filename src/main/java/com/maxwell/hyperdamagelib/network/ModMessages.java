@@ -1,7 +1,8 @@
 package com.maxwell.hyperdamagelib.network;
 
-
 import com.maxwell.hyperdamagelib.HDL;
+import com.maxwell.hyperdamagelib.network.client.ClientboundDecayEffectPacket;
+import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
@@ -26,6 +27,11 @@ public class ModMessages {
                 .encoder(ClientboundDecaySyncPacket::encode)
                 .decoder(ClientboundDecaySyncPacket::decode)
                 .consumerMainThread(ClientboundDecaySyncPacket::handle)
+                .add();
+        INSTANCE.messageBuilder(ClientboundDecayEffectPacket.class, id())
+                .encoder(ClientboundDecayEffectPacket::encode)
+                .decoder(ClientboundDecayEffectPacket::decode)
+                .consumerMainThread(ClientboundDecayEffectPacket::handle)
                 .add();
     }
 

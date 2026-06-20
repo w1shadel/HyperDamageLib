@@ -1,4 +1,6 @@
 {
 "creative_tab.hyperdamagelib.prime_tab": "HyperDamageLibrary",
-  "item.hyperdamagelib.erosion_sword": "Erosion Sword"
+  "item.hyperdamagelib.erosion_sword": "Erosion Sword",
+  "death.attack.void_shred": "%1$s was shredded by spatial rupture.",
+  "death.attack.erosion": "%1$s has been deleted."
 }

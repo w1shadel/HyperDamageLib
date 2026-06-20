@@ -1,6 +1,5 @@
 package com.maxwell.hyperdamagelib.item;
 
-
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.core.particles.ParticleTypes;
@@ -29,48 +28,36 @@ public class ErosionSwordItem extends SwordItem {
         super(Tiers.NETHERITE, 3, -2.4F, properties);
     }
 
-
     @Override
     public boolean onEntitySwing(ItemStack stack, LivingEntity attacker) {
         Level level = attacker.level();
         if (!level.isClientSide()) {
             double range = 4.5D;
             double width = 1.8D;
-
             Vec3 eyePosition = attacker.getEyePosition(1.0F);
             Vec3 lookVector = attacker.getLookAngle();
-
             AABB searchBox = attacker.getBoundingBox()
                     .expandTowards(lookVector.scale(range))
                     .inflate(width, 1.0D, width);
-
             List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, searchBox,
                     entity -> entity != attacker && entity.isAlive() && !entity.isSpectator()
             );
-
-            DamageSource erosionSource = DecayDamageUtil.getErosionSource(level , attacker);
-
+            DamageSource erosionSource = DecayDamageUtil.getErosionSource(level, attacker);
             boolean hitAny = false;
             for (LivingEntity target : targets) {
                 Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePosition);
                 double distance = toTarget.length();
-
                 if (distance <= range) {
                     double dot = lookVector.dot(toTarget.normalize());
-
                     if (dot > 0.5D) {
                         if (target instanceof IDecayEntity decayTarget) {
-
                             target.hurt(erosionSource, Integer.MAX_VALUE);
-
                             if (level instanceof ServerLevel serverLevel) {
                                 serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.3D, 0.3D, 0.3D, 0.1D);
                                 serverLevel.sendParticles(ParticleTypes.WITCH, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 10, 0.2D, 0.2D, 0.2D, 0.1D);
                             }
-
                             level.playSound(null, target.blockPosition(), SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.3F);
                             level.playSound(null, target.blockPosition(), SoundEvents.WITHER_HURT, SoundSource.PLAYERS, 0.5F, 1.5F);
-
                             if (attacker instanceof Player player) {
                                 player.displayClientMessage(Component.literal(String.format(
                                         "§d[超貫通・空間薙ぎ払い] %s に " + Integer.MAX_VALUE + " の絶対ダメージを与えました。残HP: %.2f",
@@ -82,7 +69,6 @@ public class ErosionSwordItem extends SwordItem {
                     }
                 }
             }
-
             if (!hitAny) {
                 level.playSound(null, attacker.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.5F, 1.2F);
             }
@@ -95,17 +81,14 @@ public class ErosionSwordItem extends SwordItem {
         return super.hurtEnemy(stack, target, attacker);
     }
 
-    
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide()) {
             if (player instanceof IDecayEntity decayPlayer) {
-
                 if (player.isShiftKeyDown()) {
                     boolean nextState = !decayPlayer.isSuperInvincible();
                     decayPlayer.setSuperInvincible(nextState);
-
                     if (nextState) {
                         player.displayClientMessage(Component.literal("§d[超無敵モード] §fON に設定しました。絶対死を回避します。"), true);
                         level.playSound(null, player.blockPosition(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
@@ -116,15 +99,13 @@ public class ErosionSwordItem extends SwordItem {
                         player.displayClientMessage(Component.literal("§7[超無敵モード] §7OFF に設定しました。通常の状態に戻ります。"), true);
                         level.playSound(null, player.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
                     }
-                }
-                else {
+                } else {
                     double aoeRange = 6.0D;
                     AABB searchBox = player.getBoundingBox().inflate(aoeRange);
                     List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, searchBox,
                             entity -> entity.isAlive() && !entity.isSpectator()
                     );
-                    DamageSource erosionSource = DecayDamageUtil.getErosionSource(level,player);
-
+                    DamageSource erosionSource = DecayDamageUtil.getErosionSource(level, player);
                     boolean hitAny = false;
                     for (LivingEntity target : targets) {
                         target.hurt(erosionSource, 10.0F);
@@ -144,7 +125,6 @@ public class ErosionSwordItem extends SwordItem {
                     } else {
                         player.displayClientMessage(Component.literal("§7[絶対侵食波] 衝撃波を放ちましたが、周囲に敵がいませんでした。"), true);
                     }
-
                     player.getCooldowns().addCooldown(this, 00);
                 }
             }
