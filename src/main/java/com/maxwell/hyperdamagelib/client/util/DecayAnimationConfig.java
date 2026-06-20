@@ -1,9 +1,5 @@
 package com.maxwell.hyperdamagelib.client.util;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-
 public class DecayAnimationConfig {
     private final DecayItemAnimationRegistry.IItemAnimator animator;
     private final boolean hasAura;
@@ -16,6 +12,10 @@ public class DecayAnimationConfig {
     private final float auraPulseSpeed;
     private final float auraPulseAmplitude;
     private final AuraShape auraShape;
+    private final boolean hasSmoke;
+    private final int smokeCount;
+    private final float smokeSize;
+    private final long smokeLifetime;
 
     private DecayAnimationConfig(Builder builder) {
         this.animator = builder.animator;
@@ -29,29 +29,82 @@ public class DecayAnimationConfig {
         this.auraPulseSpeed = builder.auraPulseSpeed;
         this.auraPulseAmplitude = builder.auraPulseAmplitude;
         this.auraShape = builder.auraShape;
+        this.hasSmoke = builder.hasSmoke;
+        this.smokeCount = builder.smokeCount;
+        this.smokeSize = builder.smokeSize;
+        this.smokeLifetime = builder.smokeLifetime;
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    public DecayItemAnimationRegistry.IItemAnimator getAnimator() { return animator; }
-    public boolean hasAura() { return hasAura; }
-    public int getRed() { return r; }
-    public int getGreen() { return g; }
-    public int getBlue() { return b; }
-    public int getAlpha() { return a; }
-    public float getAuraScale() { return auraScale; }
-    public float getAuraRotateSpeed() { return auraRotateSpeed; }
-    public float getAuraPulseSpeed() { return auraPulseSpeed; }
-    public float getAuraPulseAmplitude() { return auraPulseAmplitude; }
-    public AuraShape getAuraShape() { return auraShape; }
+    public DecayItemAnimationRegistry.IItemAnimator getAnimator() {
+        return animator;
+    }
+
+    public boolean hasAura() {
+        return hasAura;
+    }
+
+    public int getRed() {
+        return r;
+    }
+
+    public int getGreen() {
+        return g;
+    }
+
+    public int getBlue() {
+        return b;
+    }
+
+    public int getAlpha() {
+        return a;
+    }
+
+    public float getAuraScale() {
+        return auraScale;
+    }
+
+    public float getAuraRotateSpeed() {
+        return auraRotateSpeed;
+    }
+
+    public float getAuraPulseSpeed() {
+        return auraPulseSpeed;
+    }
+
+    public float getAuraPulseAmplitude() {
+        return auraPulseAmplitude;
+    }
+
+    public AuraShape getAuraShape() {
+        return auraShape;
+    }
+
+    public boolean hasSmoke() {
+        return hasSmoke;
+    }
+
+    public int getSmokeCount() {
+        return smokeCount;
+    }
+
+    public float getSmokeSize() {
+        return smokeSize;
+    }
+
+    public long getSmokeLifetime() {
+        return smokeLifetime;
+    }
 
     public enum AuraShape {
-        SQUARE,    
-        DIAMOND,   
-        TRIANGLE,  
-        OCTAGON    
+        SQUARE,
+        DIAMOND,
+        TRIANGLE,
+        OCTAGON,
+        BLACK_HOLE
     }
 
     public static class Builder {
@@ -62,10 +115,14 @@ public class DecayAnimationConfig {
         private int b = 255;
         private int a = 128;
         private float auraScale = 0.44F;
-        private float auraRotateSpeed = -40.0F; 
-        private float auraPulseSpeed = 4.0F;    
-        private float auraPulseAmplitude = 0.12F; 
+        private float auraRotateSpeed = -40.0F;
+        private float auraPulseSpeed = 4.0F;
+        private float auraPulseAmplitude = 0.12F;
         private AuraShape auraShape = AuraShape.SQUARE;
+        private boolean hasSmoke = false;
+        private int smokeCount = 6;
+        private float smokeSize = 1.0F;
+        private long smokeLifetime = 2500L;
 
         public Builder animator(DecayItemAnimationRegistry.IItemAnimator animator) {
             this.animator = animator;
@@ -106,10 +163,30 @@ public class DecayAnimationConfig {
             return this;
         }
 
+        public Builder smoke(boolean hasSmoke) {
+            this.hasSmoke = hasSmoke;
+            return this;
+        }
+
+        public Builder smokeDensity(int count) {
+            this.smokeCount = count;
+            return this;
+        }
+
+        public Builder smokeSize(float scale) {
+            this.smokeSize = scale;
+            return this;
+        }
+
+        public Builder smokeLifetime(long lifetimeMs) {
+            this.smokeLifetime = lifetimeMs;
+            return this;
+        }
+
         public DecayAnimationConfig build() {
             if (this.animator == null) {
-
-                this.animator = (poseStack, displayContext, stack, time) -> {};
+                this.animator = (poseStack, displayContext, stack, time) -> {
+                };
             }
             return new DecayAnimationConfig(this);
         }
