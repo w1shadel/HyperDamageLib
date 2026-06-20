@@ -16,14 +16,14 @@ public final class DecayClientEffectHelper {
     public static float accumulatedRotation = 0.0f;
     public static float currentWaveAmplitude = 0.0f;
     public static float currentWaveSpeed = 0.0f;
-    private static float scaleXVelocity = 0.0f;
-    private static float scaleYVelocity = 0.0f;
-    private static float rotationVelocity = 0.0f;
     public static float targetScaleX = 1.0f;
     public static float targetScaleY = 1.0f;
     public static float targetSpinSpeed = 0.0f;
     public static float targetWaveAmplitude = 0.0f;
     public static float targetWaveSpeed = 0.0f;
+    private static float scaleXVelocity = 0.0f;
+    private static float scaleYVelocity = 0.0f;
+    private static float rotationVelocity = 0.0f;
 
     private DecayClientEffectHelper() {
     }

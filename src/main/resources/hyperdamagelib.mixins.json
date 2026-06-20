@@ -15,7 +15,8 @@
   "client": [
     "client.MinecraftMixin",
     "client.ClientPacketListenerMixin",
-    "client.GuiMixin"
+    "client.ItemRendererMixin",
+    "client.ItemTransformMixin"
   ],
   "injectors": {
     "defaultRequire": 1
