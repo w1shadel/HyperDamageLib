@@ -33,7 +33,11 @@ public class DecayForceKillHelper {
         DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
         entity.die(erosion);
         dropAllForce(entity);
-        if (!(entity instanceof Player)) {
+        boolean isMultiPartBoss = false;
+        if (entity instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon) {
+            isMultiPartBoss = true;
+        }
+        if (!isMultiPartBoss && !(entity instanceof Player)) {
             removeFromMemory(entity);
         }
     }

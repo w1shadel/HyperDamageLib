@@ -60,8 +60,11 @@ public class DecayGenericTransformer {
                 }
             }
         }
-        if (classNode.name.equals("net/minecraft/world/entity/LivingEntity")) {
+        if (classNode.name.equals("net/minecraft/world/entity/LivingEntity") ||
+                isSubclass(classNode.name, "net/minecraft/world/entity/LivingEntity", false)) {
+
             for (MethodNode method : classNode.methods) {
+
                 if ((method.name.equals("die") || method.name.equals("m_6667_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
                     InsnList insnList = new InsnList();
@@ -76,12 +79,13 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
+                    insnList.add(new InsnNode(Opcodes.RETURN)); 
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
+
                 if ((method.name.equals("hurt") || method.name.equals("m_6469_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)Z")) {
                     InsnList insnList = new InsnList();
@@ -97,13 +101,14 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.ICONST_1));
+                    insnList.add(new InsnNode(Opcodes.ICONST_1)); 
                     insnList.add(new InsnNode(Opcodes.IRETURN));
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 3);
                     modified = true;
                 }
+
                 if ((method.name.equals("actuallyHurt") || method.name.equals("m_6475_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)V")) {
                     InsnList insnList = new InsnList();
@@ -119,12 +124,13 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
+                    insnList.add(new InsnNode(Opcodes.RETURN)); 
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 3);
                     modified = true;
                 }
+
                 if ((method.name.equals("setHealth") || method.name.equals("m_21153_")) &&
                         method.desc.equals("(F)V")) {
                     InsnList insnList = new InsnList();
@@ -137,28 +143,9 @@ public class DecayGenericTransformer {
                             "(Lnet/minecraft/world/entity/LivingEntity;F)F",
                             false
                     ));
-                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1));
+                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1)); 
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-                if ((method.name.equals("dropAllDeathLoot") || method.name.equals("m_6668_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceDropLoot",
-                            "(Lnet/minecraft/world/entity/LivingEntity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 1);
                     modified = true;
                 }
             }
@@ -452,6 +439,18 @@ public class DecayGenericTransformer {
     public static boolean isSubclass(String className, String superClass, boolean isInterface) {
         if (className.equals(superClass) || superClass.equals("java/lang/Object")) return true;
         if (className.equals("java/lang/Object")) return false;
+        if (className.startsWith("java/") ||
+                className.startsWith("javax/") ||
+                className.startsWith("sun/") ||
+                className.startsWith("com/sun/") ||
+                className.startsWith("jdk/") ||
+                className.startsWith("org/lwjgl/") ||
+                className.startsWith("org/apache/") ||
+                className.startsWith("io/netty/") ||
+                className.startsWith("com/google/") ||
+                className.startsWith("org/spongepowered/")) {
+            return false;
+        }
         String currentName = className;
         ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
         while (!currentName.equals("java/lang/Object")) {

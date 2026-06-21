@@ -57,7 +57,6 @@ public class ErosionSwordItem extends SwordItem {
                         actualTarget = parent;
                     }
                 }
-
                 if (actualTarget instanceof LivingEntity target) {
                     Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePosition);
                     double distance = toTarget.length();
@@ -78,8 +77,7 @@ public class ErosionSwordItem extends SwordItem {
 
                             if (target instanceof IDecayEntity decayTarget) {
 
-                                boolean success = target.hurt(erosionSource, 20.0F); 
-
+                                boolean success = rawTarget.hurt(erosionSource, 20.0F);
 
                                 if (!success) {
 
@@ -91,24 +89,15 @@ public class ErosionSwordItem extends SwordItem {
                                     target.setHealth(targetHealth);
                                 } else {
 
-                                    target.hurt(erosionSource, Integer.MAX_VALUE);
+
+                                    rawTarget.hurt(erosionSource, Float.MAX_VALUE);
                                 }
+
 
                                 if (level instanceof ServerLevel serverLevel) {
                                     serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.3D, 0.3D, 0.3D, 0.1D);
-                                    serverLevel.sendParticles(ParticleTypes.WITCH, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 10, 0.2D, 0.2D, 0.2D, 0.1D);
                                 }
                                 level.playSound(null, target.blockPosition(), SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.3F);
-                                level.playSound(null, target.blockPosition(), SoundEvents.WITHER_HURT, SoundSource.PLAYERS, 0.5F, 1.5F);
-
-                                if (attacker instanceof Player player) {
-                                    player.displayClientMessage(Component.translatable(
-                                            "message.hyperdamagelib.erosion.swipe_hit",
-                                            target.getDisplayName(),
-                                            "Absolute",
-                                            target.getHealth()
-                                    ), true);
-                                }
                                 hitAny = true;
                             }
                         }
