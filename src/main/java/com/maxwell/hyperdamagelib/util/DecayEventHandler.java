@@ -4,6 +4,7 @@ import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.item.ErosionSwordItem;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -37,8 +38,12 @@ public class DecayEventHandler {
             Player attacker = event.getEntity();
             ItemStack heldItem = attacker.getMainHandItem();
             if (heldItem.getItem() instanceof ErosionSwordItem) {
-                float decayPerHit = livingTarget.getMaxHealth() * 0.20F;
-                decayTarget.addDecayAmount(decayPerHit);
+                float maxHp = livingTarget.getMaxHealth();
+                if (maxHp >= 3.0E38F || Float.isInfinite(maxHp) || Float.isNaN(maxHp)) {
+                    com.maxwell.hyperdamagelib.util.DecayForceKillHelper.decayForceKill(livingTarget);
+                    livingTarget.level().broadcastEntityEvent(livingTarget, (byte) 2);
+                    return;
+                }
                 livingTarget.level().broadcastEntityEvent(livingTarget, (byte) 2);
             }
         }
@@ -55,6 +60,40 @@ public class DecayEventHandler {
                 float reductionRatio = 0.5F;
                 float reduction = healAmount * reductionRatio;
                 decay.setDecayAmount(Math.max(0.0F, decayAmount - reduction));
+            }
+        }
+    }
+    @SubscribeEvent
+    public static void onLivingTickInvincibleSafety(LivingEvent.LivingTickEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity.level().isClientSide()) return;
+
+        if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
+            double minHeight = entity.level().getMinBuildHeight() - 32.0D;
+            if (entity.getY() < minHeight) {
+                if (entity instanceof ServerPlayer player) {
+                    net.minecraft.core.BlockPos respawnPos = player.getRespawnPosition();
+                    if (respawnPos == null) {
+                        respawnPos = player.level().getSharedSpawnPos();
+                    }
+
+                    player.teleportTo(
+                            player.server.getLevel(player.getRespawnDimension()),
+                            respawnPos.getX() + 0.5D,
+                            respawnPos.getY() + 1.0D,
+                            respawnPos.getZ() + 0.5D,
+                            player.getYRot(),
+                            player.getXRot()
+                    );
+
+                    player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_fall"), true);
+                } else {
+
+                    net.minecraft.core.BlockPos sharedSpawn = entity.level().getSharedSpawnPos();
+                    entity.teleportTo(sharedSpawn.getX() + 0.5D, sharedSpawn.getY() + 1.0D, sharedSpawn.getZ() + 0.5D);
+                }
+
+                entity.fallDistance = 0.0F;
             }
         }
     }
@@ -167,7 +206,7 @@ public class DecayEventHandler {
         if (event.getTarget() instanceof IDecayEntity decay && event.getEntity() instanceof ServerPlayer serverPlayer) {
             ModMessages.INSTANCE.send(
                     PacketDistributor.PLAYER.with(() -> serverPlayer),
-                    new ClientboundDecaySyncPacket(event.getTarget().getId(), decay.getDecayAmount(), decay.isSuperInvincible())
+                    new ClientboundDecaySyncPacket(event.getTarget().getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue())
             );
         }
     }
@@ -177,7 +216,7 @@ public class DecayEventHandler {
         if (event.getEntity() instanceof ServerPlayer serverPlayer && serverPlayer instanceof IDecayEntity decay) {
             ModMessages.INSTANCE.send(
                     PacketDistributor.PLAYER.with(() -> serverPlayer),
-                    new ClientboundDecaySyncPacket(serverPlayer.getId(), decay.getDecayAmount(), decay.isSuperInvincible())
+                    new ClientboundDecaySyncPacket(serverPlayer.getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue())
             );
         }
     }

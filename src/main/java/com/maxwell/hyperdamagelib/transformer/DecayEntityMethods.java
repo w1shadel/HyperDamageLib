@@ -18,7 +18,7 @@ public class DecayEntityMethods {
     public static float replaceGetHealth(LivingEntity livingEntity) {
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
-                return livingEntity.getMaxHealth();
+                return decay.getInvincibleHealthValue();
             }
             float cappedHealth = livingEntity.getMaxHealth() - decay.getDecayAmount();
             return Math.max(-Float.MAX_VALUE, cappedHealth);
@@ -29,7 +29,7 @@ public class DecayEntityMethods {
     public static float getHealth(float health, LivingEntity livingEntity) {
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
-                return livingEntity.getMaxHealth();
+                return decay.getInvincibleHealthValue();
             }
             float decayAmount = decay.getDecayAmount();
             if (decayAmount > 0.0F) {
@@ -201,7 +201,7 @@ public class DecayEntityMethods {
 
     public static float handleSetHealth(LivingEntity entity, float health) {
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-            return entity.getMaxHealth();
+            return decay.getInvincibleHealthValue();
         }
         return health;
     }

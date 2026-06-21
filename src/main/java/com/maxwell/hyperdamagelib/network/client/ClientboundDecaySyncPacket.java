@@ -14,21 +14,33 @@ public class ClientboundDecaySyncPacket {
     private final int entityId;
     private final float decayAmount;
     private final boolean superInvincible;
+    private final boolean keepCurrentHealth;
+    private final float invincibleHealthValue;
 
-    public ClientboundDecaySyncPacket(int entityId, float decayAmount, boolean superInvincible) {
+    public ClientboundDecaySyncPacket(int entityId, float decayAmount, boolean superInvincible, boolean keepCurrentHealth, float invincibleHealthValue) {
         this.entityId = entityId;
         this.decayAmount = decayAmount;
         this.superInvincible = superInvincible;
+        this.keepCurrentHealth = keepCurrentHealth;
+        this.invincibleHealthValue = invincibleHealthValue;
     }
 
     public static void encode(ClientboundDecaySyncPacket msg, FriendlyByteBuf buf) {
         buf.writeInt(msg.entityId);
         buf.writeFloat(msg.decayAmount);
         buf.writeBoolean(msg.superInvincible);
+        buf.writeBoolean(msg.keepCurrentHealth);
+        buf.writeFloat(msg.invincibleHealthValue);
     }
 
     public static ClientboundDecaySyncPacket decode(FriendlyByteBuf buf) {
-        return new ClientboundDecaySyncPacket(buf.readInt(), buf.readFloat(), buf.readBoolean());
+        return new ClientboundDecaySyncPacket(
+                buf.readInt(),
+                buf.readFloat(),
+                buf.readBoolean(),
+                buf.readBoolean(),
+                buf.readFloat()
+        );
     }
 
     public static void handle(ClientboundDecaySyncPacket msg, Supplier<NetworkEvent.Context> ctx) {
@@ -47,7 +59,9 @@ public class ClientboundDecaySyncPacket {
             Entity entity = mc.level.getEntity(this.entityId);
             if (entity instanceof IDecayEntity decay) {
                 decay.setDecayAmount(this.decayAmount);
-                decay.setSuperInvincible(this.superInvincible);
+                decay.setKeepCurrentHealth(this.keepCurrentHealth);
+                decay.setInvincibleHealthValue(this.invincibleHealthValue);
+                decay.setSuperInvincible(this.superInvincible); 
             }
         }
     }

@@ -51,13 +51,10 @@ public class VoidShredSwordItem extends SwordItem {
                 double distance = toTarget.length();
                 if (distance <= range) {
                     double dot = lookVector.dot(toTarget.normalize());
-
                     if (dot > 0.5D) {
-
                         target.hurt(voidShredSource, 25.0F);
 
                         if (level instanceof ServerLevel serverLevel) {
-
                             serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 20, 0.4D, 0.4D, 0.4D, 0.15D);
                             serverLevel.sendParticles(ParticleTypes.PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 10, 0.2D, 0.2D, 0.2D, 0.2D);
                         }
@@ -92,13 +89,12 @@ public class VoidShredSwordItem extends SwordItem {
             boolean affected = false;
 
             for (LivingEntity target : targets) {
-
                 Vec3 pullDir = playerPos.subtract(target.position()).normalize();
                 double distance = target.position().distanceTo(playerPos);
 
                 double pullForce = Math.max(0.2D, (pullRange - distance) * 0.25D);
                 target.setDeltaMovement(target.getDeltaMovement().add(pullDir.scale(pullForce)));
-                target.hurtMarked = true; 
+                target.hurtMarked = true;
 
                 target.hurt(voidShredSource, 15.0F);
 
@@ -109,16 +105,15 @@ public class VoidShredSwordItem extends SwordItem {
             }
 
             if (affected) {
-                player.displayClientMessage(Component.literal("§d[空間重力崩壊] 周囲の敵を吸引し、空間を引き裂きました。"), true);
+                player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_shred.gravity_pull"), true);
                 level.playSound(null, player.blockPosition(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.PLAYERS, 0.7F, 1.4F);
                 level.playSound(null, player.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 0.5F, 1.8F);
 
                 if (level instanceof ServerLevel serverLevel) {
-
                     serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, player.getX(), player.getY() + 1.0D, player.getZ(), 60, 0.8D, 0.8D, 0.8D, 0.3D);
                 }
             } else {
-                player.displayClientMessage(Component.literal("§7[空間重力崩壊] 空間が歪みましたが、引き寄せる敵がいませんでした。"), true);
+                player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_shred.gravity_miss"), true);
                 level.playSound(null, player.blockPosition(), SoundEvents.PORTAL_AMBIENT, SoundSource.PLAYERS, 0.4F, 2.0F);
             }
 
@@ -129,10 +124,10 @@ public class VoidShredSwordItem extends SwordItem {
 
     @Override
     public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.literal("§d[Void Shred 空間裂断刃]"));
-        tooltip.add(Component.literal("§7左クリック：前方の空間を切り裂き、広範囲の敵に §f25.0 空間ダメージ §7を与える。"));
-        tooltip.add(Component.literal("§c右クリック：周囲8mの敵を自身へ「強制吸引」し、§f15.0 空間崩壊ダメージ §cを与える。"));
-        tooltip.add(Component.literal("§d[空間を切り裂く特異点エネルギー搭載]"));
+        tooltip.add(Component.translatable("item.hyperdamagelib.void_shred_sword.tooltip_header"));
+        tooltip.add(Component.translatable("item.hyperdamagelib.void_shred_sword.tooltip_1"));
+        tooltip.add(Component.translatable("item.hyperdamagelib.void_shred_sword.tooltip_2"));
+        tooltip.add(Component.translatable("item.hyperdamagelib.void_shred_sword.tooltip_3"));
         super.appendHoverText(stack, level, tooltip, flag);
     }
 }

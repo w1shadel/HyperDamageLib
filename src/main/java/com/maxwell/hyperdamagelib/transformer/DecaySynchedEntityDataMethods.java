@@ -55,10 +55,9 @@ public class DecaySynchedEntityDataMethods {
                 if (decayEntity.isSuperInvincible()) {
                     if (accessor.equals(LivingEntityAccessor.getDataHealthId())) {
                         if (value instanceof Float) {
-                            return Float.valueOf(living.getMaxHealth());
+                            return Float.valueOf(decayEntity.getInvincibleHealthValue());
                         }
                     }
-
                 }
             }
         } catch (Throwable ignored) {

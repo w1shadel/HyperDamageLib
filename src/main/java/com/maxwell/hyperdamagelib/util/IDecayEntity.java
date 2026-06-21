@@ -1,23 +1,44 @@
 package com.maxwell.hyperdamagelib.util;
 
 public interface IDecayEntity {
-    float getDecayAmount();
+    default float getDecayAmount() {
+        return 0.0F;
+    }
 
-    void setDecayAmount(float amount);
+    default void setDecayAmount(float amount) {}
 
-    void addDecayAmount(float amount);
+    default void addDecayAmount(float amount) {}
 
-    boolean isSuperInvincible();
+    default boolean isSuperInvincible() {
+        return false;
+    }
 
-    void setSuperInvincible(boolean val);
+    default void setSuperInvincible(boolean val) {}
 
-    boolean isRemoveBypass();
+    default boolean isRemoveBypass() {
+        return false;
+    }
 
-    void setRemoveBypass(boolean val);
+    default void setRemoveBypass(boolean val) {}
 
-    void subtractTrueHP(float amount);
+    default void subtractTrueHP(float amount) {}
 
-    int getDecayHoldTicks();
+    default int getDecayHoldTicks() {
+        return 0;
+    }
 
-    void setDecayHoldTicks(int ticks);
+    default void setDecayHoldTicks(int ticks) {}
+
+
+    default boolean isKeepCurrentHealth() {
+        return false;
+    }
+
+    default void setKeepCurrentHealth(boolean val) {}
+
+    default float getInvincibleHealthValue() {
+        return 20.0F;
+    }
+
+    default void setInvincibleHealthValue(float val) {}
 }

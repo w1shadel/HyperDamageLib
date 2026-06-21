@@ -1,7 +1,30 @@
 {
-"creative_tab.hyperdamagelib.prime_tab": "HyperDamageLibrary",
+  "creative_tab.hyperdamagelib.prime_tab": "HyperDamageLibrary",
   "item.hyperdamagelib.erosion_sword": "Erosion Sword",
+  "item.hyperdamagelib.void_shred_sword": "Void Shred Sword",
   "death.attack.void_shred": "%1$s was shredded by spatial rupture.",
   "death.attack.erosion": "%1$s has been deleted.",
-  "item.hyperdamagelib.void_shred_sword": "Void Shred Sword"
+
+  "item.hyperdamagelib.erosion_sword.tooltip_1": "§7Left-Click: Sweeps the space ahead, permanently eroding maximum HP.",
+  "item.hyperdamagelib.erosion_sword.tooltip_2": "§dAttack Bonus: Directly deals §f15.00 absolute damage§d to all targets within range, ignoring defense.",
+  "item.hyperdamagelib.erosion_sword.tooltip_3": "§cRight-Click: Releases a §f30.0 Erosion Shockwave§c to all targets within 6m, bypassing all defenses.",
+  "item.hyperdamagelib.erosion_sword.tooltip_4": "§dShift + Right-Click: Toggle your \"Super Invincible Mode\".",
+  "item.hyperdamagelib.erosion_sword.tooltip_5": "§d[Equipped with Mixin Priority Override System]",
+
+  "item.hyperdamagelib.void_shred_sword.tooltip_header": "§d[Void Shred Spatial Cleaver]",
+  "item.hyperdamagelib.void_shred_sword.tooltip_1": "§7Left-Click: Tears the space ahead, dealing §f25.0 void damage§7 to enemies in a wide area, bypassing defense.",
+  "item.hyperdamagelib.void_shred_sword.tooltip_2": "§cRight-Click: Forces nearby enemies within 8m to be \"pulled in\", dealing §f15.0 spatial collapse damage§c.",
+  "item.hyperdamagelib.void_shred_sword.tooltip_3": "§d[Equipped with Singularity Energy to shred through space]",
+
+  "message.hyperdamagelib.erosion.swipe_hit": "§d[Absolute Sweep] Dealt %2$s absolute damage to %1$s. Remaining HP: %3$.2f",
+  "message.hyperdamagelib.super_invincible.on": "§d[Super Invincible Mode] Set to §fON§d. Avoiding absolute death.",
+  "message.hyperdamagelib.super_invincible.on_max": "§d[Super Invincible Mode] Set to §fON (Max HP Locked)§d.",
+  "message.hyperdamagelib.super_invincible.on_current": "§d[Super Invincible Mode] Set to §fON (Preserving HP: %.1f)§d.",
+  "message.hyperdamagelib.super_invincible.off": "§7[Super Invincible Mode] Set to §7OFF§7. Returning to normal state.",
+  "message.hyperdamagelib.erosion.wave_hit": "§c[Absolute Erosion Wave] Applied erosion and dealt absolute damage to surrounding entities.",
+  "message.hyperdamagelib.erosion.wave_miss": "§7[Absolute Erosion Wave] Released a shockwave, but no enemies were nearby.",
+  "message.hyperdamagelib.void_shred.gravity_pull": "§d[Spatial Gravity Collapse] Pulled in surrounding enemies and shredded space.",
+  "message.hyperdamagelib.void_shred.gravity_miss": "§7[Spatial Gravity Collapse] Space warped, but there were no enemies to pull.",
+
+  "message.hyperdamagelib.void_fall": "§c[Void Rescue] You have been rescued from the Abyss and teleported to a safe location."
 }

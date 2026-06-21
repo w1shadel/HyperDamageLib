@@ -1,7 +1,30 @@
 {
   "creative_tab.hyperdamagelib.prime_tab": "HyperDamageLibrary",
   "item.hyperdamagelib.erosion_sword": "殲滅の剣",
+  "item.hyperdamagelib.void_shred_sword": "虚空断裂の剣",
   "death.attack.void_shred": "%1$sは空間の裂け目に切り刻まれた。",
   "death.attack.erosion": "%1$sは消滅した。",
-  "item.hyperdamagelib.void_shred_sword": "虚空断裂の剣"
+
+  "item.hyperdamagelib.erosion_sword.tooltip_1": "§7左クリック：前方の空間を薙ぎ払い、最大HP上限を永続的に削る。",
+  "item.hyperdamagelib.erosion_sword.tooltip_2": "§d攻撃ボーナス：範囲内の全員に防御無視の §f15.00 絶対ダメージ §dを直接付与。",
+  "item.hyperdamagelib.erosion_sword.tooltip_3": "§c右クリック：周囲6mの全員に絶対防御貫通の §f30.0 侵食衝撃波 §cを放つ。",
+  "item.hyperdamagelib.erosion_sword.tooltip_4": "§dShift + 右クリック：自身の「超無敵モード」を切り替える。",
+  "item.hyperdamagelib.erosion_sword.tooltip_5": "§d[Mixin 優先度上書きシステム搭載]",
+
+  "item.hyperdamagelib.void_shred_sword.tooltip_header": "§d[Void Shred 空間裂断刃]",
+  "item.hyperdamagelib.void_shred_sword.tooltip_1": "§7左クリック：前方の空間を切り裂き、広範囲の敵に防御貫通の §f25.0 空間ダメージ §7を与える。",
+  "item.hyperdamagelib.void_shred_sword.tooltip_2": "§c右クリック：周囲8mの敵を自身へ「強制吸引」し、§f15.0 空間崩壊ダメージ §cを与える。",
+  "item.hyperdamagelib.void_shred_sword.tooltip_3": "§d[空間を切り裂く特異点エネルギー搭載]",
+
+  "message.hyperdamagelib.erosion.swipe_hit": "§d[超貫通・空間薙ぎ払い] %1$s に %2$s の絶対ダメージを与えました。残HP: %3$.2f",
+  "message.hyperdamagelib.super_invincible.on": "§d[超無敵モード] §fON に設定しました。絶対死を回避します。",
+  "message.hyperdamagelib.super_invincible.on_max": "§d[超無敵モード] §fON (最大HP維持) に設定しました。絶対死を回避します。",
+  "message.hyperdamagelib.super_invincible.on_current": "§d[超無敵モード] §fON (現在HP: %.1f 固定) に設定しました。絶対死を回避します。",
+  "message.hyperdamagelib.super_invincible.off": "§7[超無敵モード] §7OFF に設定しました。通常の状態に戻ります。",
+  "message.hyperdamagelib.erosion.wave_hit": "§c[絶対侵食波] 周囲の存在に侵食を付与し、絶対ダメージを与えました。",
+  "message.hyperdamagelib.erosion.wave_miss": "§7[絶対侵食波] 衝撃波を放ちましたが、周囲に敵がいませんでした。",
+  "message.hyperdamagelib.void_shred.gravity_pull": "§d[空間重力崩壊] 周囲の敵を吸引し、空間を引き裂きました。",
+  "message.hyperdamagelib.void_shred.gravity_miss": "§7[空間重力崩壊] 空間が歪みましたが、引き寄せる敵がいませんでした。",
+
+  "message.hyperdamagelib.void_fall": "§c[Void Rescue] 奈落から救出され、安全な位置に転送されました。"
 }

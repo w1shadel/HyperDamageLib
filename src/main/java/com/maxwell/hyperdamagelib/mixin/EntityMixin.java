@@ -20,7 +20,9 @@ public abstract class EntityMixin {
     private void csp$preventRemoval(Entity.RemovalReason reason, CallbackInfo ci) {
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             if (!decay.isRemoveBypass()) {
-                ci.cancel();
+                if (reason == Entity.RemovalReason.KILLED || reason == Entity.RemovalReason.DISCARDED) {
+                    ci.cancel();
+                }
             }
         }
     }
