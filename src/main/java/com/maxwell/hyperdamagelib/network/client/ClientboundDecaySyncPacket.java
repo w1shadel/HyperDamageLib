@@ -61,7 +61,7 @@ public class ClientboundDecaySyncPacket {
                 decay.setDecayAmount(this.decayAmount);
                 decay.setKeepCurrentHealth(this.keepCurrentHealth);
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
-                decay.setSuperInvincible(this.superInvincible); 
+                decay.setSuperInvincible(this.superInvincible);
             }
         }
     }

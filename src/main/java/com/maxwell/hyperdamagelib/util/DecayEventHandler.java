@@ -48,21 +48,19 @@ public class DecayEventHandler {
             }
         }
     }
-    @SubscribeEvent(priority = EventPriority.LOWEST)
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingHeal(net.minecraftforge.event.entity.living.LivingHealEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity.level().isClientSide()) return;
 
         if (entity instanceof IDecayEntity decay) {
-            float decayAmount = decay.getDecayAmount();
-            if (decayAmount > 0.0F) {
-                float healAmount = event.getAmount();
-                float reductionRatio = 0.5F;
-                float reduction = healAmount * reductionRatio;
-                decay.setDecayAmount(Math.max(0.0F, decayAmount - reduction));
+            if (decay.getDecayHoldTicks() > 0 || decay.getDecayAmount() > 0.0F) {
+                event.setCanceled(true); 
             }
         }
     }
+
     @SubscribeEvent
     public static void onLivingTickInvincibleSafety(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();
@@ -88,7 +86,6 @@ public class DecayEventHandler {
 
                     player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_fall"), true);
                 } else {
-
                     net.minecraft.core.BlockPos sharedSpawn = entity.level().getSharedSpawnPos();
                     entity.teleportTo(sharedSpawn.getX() + 0.5D, sharedSpawn.getY() + 1.0D, sharedSpawn.getZ() + 0.5D);
                 }
@@ -97,6 +94,7 @@ public class DecayEventHandler {
             }
         }
     }
+
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void enforceDecayDeath(net.minecraftforge.event.entity.living.LivingDeathEvent event) {
         if (event.getEntity() instanceof IDecayEntity decayEntity) {
@@ -131,21 +129,39 @@ public class DecayEventHandler {
         if (entity instanceof ServerPlayer player && player.connection == null) {
             return;
         }
+
         if (entity instanceof IDecayEntity decay) {
             int hold = decay.getDecayHoldTicks();
-            if (hold > 0) {
-                decay.setDecayHoldTicks(hold - 1);
-            } else {
-                float currentDecay = decay.getDecayAmount();
-                if (currentDecay > 0.0f) {
-                    float maxHealth = entity.getMaxHealth();
-                    float decreaseRate;
-                    if (entity instanceof Player) {
-                        decreaseRate = maxHealth * 0.0005F;
-                    } else {
-                        decreaseRate = maxHealth * 0.0025F;
+            float currentDecay = decay.getDecayAmount();
+
+            if (currentDecay > 0.0f) {
+                float maxHealth = entity.getMaxHealth();
+                float baseDecreaseRate = entity instanceof Player ? maxHealth * 0.0005F : maxHealth * 0.0025F;
+
+                float regenBoost = 0.0F;
+                if (entity.hasEffect(net.minecraft.world.effect.MobEffects.REGENERATION)) {
+                    int amp = entity.getEffect(net.minecraft.world.effect.MobEffects.REGENERATION).getAmplifier();
+                    regenBoost = 1.0F + (amp + 1) * 0.10F;
+                }
+
+                float finalDecrease = 0.0F;
+                if (hold > 0) {
+                    decay.setDecayHoldTicks(hold - 1);
+
+                    if (regenBoost > 0.0F) {
+                        finalDecrease = baseDecreaseRate * regenBoost;
                     }
-                    decay.setDecayAmount(Math.max(0.0f, currentDecay - decreaseRate));
+                } else {
+
+                    if (regenBoost > 0.0F) {
+                        finalDecrease = baseDecreaseRate * regenBoost;
+                    } else {
+                        finalDecrease = baseDecreaseRate;
+                    }
+                }
+
+                if (finalDecrease > 0.0F) {
+                    decay.setDecayAmount(Math.max(0.0f, currentDecay - finalDecrease));
                 }
             }
         }
@@ -153,11 +169,21 @@ public class DecayEventHandler {
 
     @SubscribeEvent
     public static void onItemUseFinish(net.minecraftforge.event.entity.living.LivingEntityUseItemEvent.Finish event) {
-        if (event.getEntity() instanceof Player player && player instanceof IDecayEntity decay) {
-            if (!player.level().isClientSide() && event.getItem().isEdible()) {
-                float maxHealth = player.getMaxHealth();
-                float reduction = maxHealth * 0.30F;
-                decay.setDecayAmount(Math.max(0.0f, decay.getDecayAmount() - reduction));
+        LivingEntity entity = event.getEntity();
+        if (entity == null || entity.level().isClientSide()) return;
+
+        if (entity instanceof IDecayEntity decay && event.getItem().isEdible()) {
+            net.minecraft.world.food.FoodProperties food = event.getItem().getItem().getFoodProperties();
+            if (food != null) {
+                int nutrition = food.getNutrition();
+
+                float decayReduction = entity.getMaxHealth() * (nutrition * 0.025F);
+
+                float currentDecay = decay.getDecayAmount();
+                if (currentDecay > 0.0F) {
+                    decay.setDecayAmount(Math.max(0.0f, currentDecay - decayReduction));
+                }
+
             }
         }
     }

@@ -56,14 +56,13 @@ public class DecayClientSetup {
                         DecayAnimationConfig.builder()
                                 .animator((poseStack, displayContext, stack, time) -> {
                                     double elapsedSeconds = (time % 3600000L) / 1000.0;
-
                                     float pulse = (float) (Math.sin(elapsedSeconds * 4.0) * 0.04);
                                     poseStack.scale(1.0F + pulse, 1.0F - pulse, 1.0F + pulse);
                                 })
                                 .aura(true)
-                                .auraColor(80, 0, 110, 190) 
+                                .auraColor(80, 0, 110, 190)
                                 .auraScale(0.38F)
-                                .auraRotateSpeed(55.0F) 
+                                .auraRotateSpeed(55.0F)
                                 .auraPulse(0.4F, 0.08F)
                                 .auraShape(DecayAnimationConfig.AuraShape.BLACK_HOLE)
                                 .smoke(true)

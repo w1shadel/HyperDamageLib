@@ -57,6 +57,7 @@ public class ErosionSwordItem extends SwordItem {
                         actualTarget = parent;
                     }
                 }
+
                 if (actualTarget instanceof LivingEntity target) {
                     Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePosition);
                     double distance = toTarget.length();
@@ -65,41 +66,14 @@ public class ErosionSwordItem extends SwordItem {
                         double dot = lookVector.dot(toTarget.normalize());
                         if (dot > 0.5D) {
 
-                            float maxHp = target.getMaxHealth();
-                            if (maxHp >= 3.0E38F || Float.isInfinite(maxHp) || Float.isNaN(maxHp)) {
-                                com.maxwell.hyperdamagelib.util.DecayForceKillHelper.decayForceKill(target);
-                                if (level instanceof ServerLevel serverLevel) {
-                                    serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 30, 0.4D, 0.4D, 0.4D, 0.15D);
-                                }
-                                hitAny = true;
-                                continue;
+
+                            rawTarget.hurt(erosionSource, 20.0F);
+
+                            if (level instanceof ServerLevel serverLevel) {
+                                serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.3D, 0.3D, 0.3D, 0.1D);
                             }
-
-                            if (target instanceof IDecayEntity decayTarget) {
-
-                                boolean success = rawTarget.hurt(erosionSource, 20.0F);
-
-                                if (!success) {
-
-                                    float decayAmount = target.getMaxHealth() * 0.20F;
-                                    decayTarget.addDecayAmount(decayAmount);
-
-                                    float currentHealth = target.getHealth();
-                                    float targetHealth = Math.max(0.0F, currentHealth - 20.0F);
-                                    target.setHealth(targetHealth);
-                                } else {
-
-
-                                    rawTarget.hurt(erosionSource, Float.MAX_VALUE);
-                                }
-
-
-                                if (level instanceof ServerLevel serverLevel) {
-                                    serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.3D, 0.3D, 0.3D, 0.1D);
-                                }
-                                level.playSound(null, target.blockPosition(), SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.3F);
-                                hitAny = true;
-                            }
+                            level.playSound(null, target.blockPosition(), SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.3F);
+                            hitAny = true;
                         }
                     }
                 }
@@ -128,7 +102,7 @@ public class ErosionSwordItem extends SwordItem {
 
                     else if (decayPlayer.isKeepCurrentHealth()) {
                         decayPlayer.setKeepCurrentHealth(false);
-                        decayPlayer.setSuperInvincible(true); 
+                        decayPlayer.setSuperInvincible(true);
                         player.displayClientMessage(Component.translatable("message.hyperdamagelib.super_invincible.on_max"), true);
 
                         level.playSound(null, player.blockPosition(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);

@@ -38,14 +38,11 @@ public class VoidShredSwordItem extends SwordItem {
             AABB searchBox = attacker.getBoundingBox()
                     .expandTowards(lookVector.scale(range))
                     .inflate(width, 1.0D, width);
-
             List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, searchBox,
                     entity -> entity != attacker && entity.isAlive() && !entity.isSpectator()
             );
-
             DamageSource voidShredSource = DecayDamageUtil.getVoidShredSource(level, attacker);
             boolean hitAny = false;
-
             for (LivingEntity target : targets) {
                 Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePosition);
                 double distance = toTarget.length();
@@ -53,7 +50,6 @@ public class VoidShredSwordItem extends SwordItem {
                     double dot = lookVector.dot(toTarget.normalize());
                     if (dot > 0.5D) {
                         target.hurt(voidShredSource, 25.0F);
-
                         if (level instanceof ServerLevel serverLevel) {
                             serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 20, 0.4D, 0.4D, 0.4D, 0.15D);
                             serverLevel.sendParticles(ParticleTypes.PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 10, 0.2D, 0.2D, 0.2D, 0.2D);
@@ -64,7 +60,6 @@ public class VoidShredSwordItem extends SwordItem {
                     }
                 }
             }
-
             if (hitAny) {
                 level.playSound(null, attacker.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.8F, 0.7F);
             } else {
@@ -84,31 +79,24 @@ public class VoidShredSwordItem extends SwordItem {
             List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, pullBox,
                     entity -> entity != player && entity.isAlive() && !entity.isSpectator()
             );
-
             DamageSource voidShredSource = DecayDamageUtil.getVoidShredSource(level, player);
             boolean affected = false;
-
             for (LivingEntity target : targets) {
                 Vec3 pullDir = playerPos.subtract(target.position()).normalize();
                 double distance = target.position().distanceTo(playerPos);
-
                 double pullForce = Math.max(0.2D, (pullRange - distance) * 0.25D);
                 target.setDeltaMovement(target.getDeltaMovement().add(pullDir.scale(pullForce)));
                 target.hurtMarked = true;
-
                 target.hurt(voidShredSource, 15.0F);
-
                 if (level instanceof ServerLevel serverLevel) {
                     serverLevel.sendParticles(ParticleTypes.PORTAL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.1D, 0.1D, 0.1D, 0.2D);
                 }
                 affected = true;
             }
-
             if (affected) {
                 player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_shred.gravity_pull"), true);
                 level.playSound(null, player.blockPosition(), SoundEvents.ENDER_DRAGON_GROWL, SoundSource.PLAYERS, 0.7F, 1.4F);
                 level.playSound(null, player.blockPosition(), SoundEvents.GENERIC_EXPLODE, SoundSource.PLAYERS, 0.5F, 1.8F);
-
                 if (level instanceof ServerLevel serverLevel) {
                     serverLevel.sendParticles(ParticleTypes.REVERSE_PORTAL, player.getX(), player.getY() + 1.0D, player.getZ(), 60, 0.8D, 0.8D, 0.8D, 0.3D);
                 }
@@ -116,7 +104,6 @@ public class VoidShredSwordItem extends SwordItem {
                 player.displayClientMessage(Component.translatable("message.hyperdamagelib.void_shred.gravity_miss"), true);
                 level.playSound(null, player.blockPosition(), SoundEvents.PORTAL_AMBIENT, SoundSource.PLAYERS, 0.4F, 2.0F);
             }
-
             player.getCooldowns().addCooldown(this, 60);
         }
         return InteractionResultHolder.success(stack);

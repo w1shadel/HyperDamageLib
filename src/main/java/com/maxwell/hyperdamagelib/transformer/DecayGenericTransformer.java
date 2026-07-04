@@ -62,9 +62,7 @@ public class DecayGenericTransformer {
         }
         if (classNode.name.equals("net/minecraft/world/entity/LivingEntity") ||
                 isSubclass(classNode.name, "net/minecraft/world/entity/LivingEntity", false)) {
-
             for (MethodNode method : classNode.methods) {
-
                 if ((method.name.equals("die") || method.name.equals("m_6667_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
                     InsnList insnList = new InsnList();
@@ -79,13 +77,12 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN)); 
+                    insnList.add(new InsnNode(Opcodes.RETURN));
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
-
                 if ((method.name.equals("hurt") || method.name.equals("m_6469_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)Z")) {
                     InsnList insnList = new InsnList();
@@ -101,14 +98,13 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.ICONST_1)); 
+                    insnList.add(new InsnNode(Opcodes.ICONST_1));
                     insnList.add(new InsnNode(Opcodes.IRETURN));
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 3);
                     modified = true;
                 }
-
                 if ((method.name.equals("actuallyHurt") || method.name.equals("m_6475_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)V")) {
                     InsnList insnList = new InsnList();
@@ -124,13 +120,12 @@ public class DecayGenericTransformer {
                     ));
                     LabelNode label = new LabelNode();
                     insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN)); 
+                    insnList.add(new InsnNode(Opcodes.RETURN));
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 3);
                     modified = true;
                 }
-
                 if ((method.name.equals("setHealth") || method.name.equals("m_21153_")) &&
                         method.desc.equals("(F)V")) {
                     InsnList insnList = new InsnList();
@@ -143,7 +138,7 @@ public class DecayGenericTransformer {
                             "(Lnet/minecraft/world/entity/LivingEntity;F)F",
                             false
                     ));
-                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1)); 
+                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1));
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
@@ -258,7 +253,17 @@ public class DecayGenericTransformer {
         for (MethodNode method : classNode.methods) {
             for (AbstractInsnNode insn : method.instructions) {
                 if (insn instanceof MethodInsnNode methodInsn) {
+
                     if ((insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKEINTERFACE) && shouldWrapInsn) {
+                        if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
+                            method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
+                            InsnList insnList = new InsnList();
+                            insnList.add(new InsnNode(Opcodes.SWAP));
+                            insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getMaxHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
+                            method.instructions.insert(methodInsn, insnList);
+                            method.maxStack += 1;
+                            modified = true;
+                        }
                         if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                             method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
                             InsnList insnList = new InsnList();
@@ -267,6 +272,7 @@ public class DecayGenericTransformer {
                             method.instructions.insert(methodInsn, insnList);
                             method.maxStack += 1;
                             modified = true;
+
                         } else if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21224_", "isDeadOrDying", "()Z", false)) {
                             method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
                             InsnList insnList = new InsnList();
@@ -318,13 +324,23 @@ public class DecayGenericTransformer {
                             method.maxStack += 1;
                             modified = true;
                         }
+
                     }
                 } else if (shouldModifyReturn) {
+
                     if (insn.getOpcode() == Opcodes.FRETURN) {
                         if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                             InsnList insnList = new InsnList();
                             insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
                             insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
+                            method.instructions.insertBefore(insn, insnList);
+                            method.maxStack += 1;
+                            modified = true;
+                        }
+                        if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
+                            InsnList insnList = new InsnList();
+                            insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getMaxHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
                             method.instructions.insertBefore(insn, insnList);
                             method.maxStack += 1;
                             modified = true;
@@ -365,6 +381,14 @@ public class DecayGenericTransformer {
                 }
             }
             if (shouldModifyReturn) {
+                if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
+                    injectHead(method,
+                            new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", false),
+                            new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "replaceGetMaxHealth", "(Lnet/minecraft/world/entity/LivingEntity;)F", false),
+                            new InsnNode(Opcodes.FRETURN));
+                    method.maxStack += 1;
+                    modified = true;
+                }
                 if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                     injectHead(method,
                             new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", false),

@@ -10,7 +10,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
-import org.spongepowered.asm.mixin.Debug;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -20,7 +19,6 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Debug(export = true)
 @Mixin(value = LivingEntity.class, priority = -10000000)
 public abstract class LivingEntityMixin implements IDecayEntity {
     @Shadow
@@ -50,6 +48,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         return self.tickCount <= 0;
     }
+
     @Unique
     private float csp$getTargetInvincibleHealth() {
         LivingEntity self = (LivingEntity) (Object) this;
@@ -58,6 +57,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         return self.getMaxHealth();
     }
+
     @Override
     public int getDecayHoldTicks() {
         return this.decayHoldTicks;
@@ -78,15 +78,27 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         LivingEntity self = (LivingEntity) (Object) this;
         this.decayAmount = Math.max(0.0f, Math.min(amount, self.getMaxHealth()));
         float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
-        if (self.getHealth() > cappedMax) {
+
+        float realHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+
+        if (realHealth > cappedMax) {
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
-                self.setHealth(cappedMax);
+                self.setHealth(cappedMax); 
             } finally {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
         }
+
+
         csp$syncToTracking();
+    }
+
+    @Override
+    public void addDecayAmount(float amount) {
+
+        this.setDecayAmount(this.decayAmount + amount);
+        this.decayHoldTicks = 100;
     }
 
     @Override
@@ -110,11 +122,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         csp$syncToTracking();
     }
-    @Override
-    public void addDecayAmount(float amount) {
-        this.decayAmount = Math.max(0.0f, this.decayAmount + amount);
-        this.decayHoldTicks = 100;
-    }
+
     @Override
     public boolean isKeepCurrentHealth() {
         return this.keepCurrentHealth;
@@ -134,6 +142,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     public void setInvincibleHealthValue(float val) {
         this.invincibleHealthValue = val;
     }
+
     @Override
     public boolean isRemoveBypass() {
         return this.decayRemoveBypass;
@@ -184,16 +193,22 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @ModifyVariable(method = "setHealth", at = @At("HEAD"), argsOnly = true)
     private float csp$modifySetHealthArg(float value) {
         if (csp$isLoginIncomplete()) {
-            if (value < 0.0f || Float.isInfinite(value) || Float.isNaN(value)) {
-                return 20.0f;
-            }
             return value;
         }
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
             return csp$getTargetInvincibleHealth();
         }
+
+        float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
+
+        if (this.decayHoldTicks > 0 || this.decayAmount > 0.0f) {
+            if (value > currentHealth) {
+
+                return Math.min(currentHealth, cappedMax);
+            }
+        }
         return Math.min(value, cappedMax);
     }
 
@@ -234,7 +249,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
-            cir.setReturnValue(csp$getTargetInvincibleHealth()); 
+            cir.setReturnValue(csp$getTargetInvincibleHealth());
             return;
         }
         if (this.decayAmount >= self.getMaxHealth()) {
@@ -255,7 +270,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (this.superInvincible) {
             this.dead = false;
             this.deathTime = 0;
-            self.setHealth(csp$getTargetInvincibleHealth()); 
+            self.setHealth(csp$getTargetInvincibleHealth());
         }
         if (!self.level().isClientSide() && this.decayAmount >= self.getMaxHealth()) {
             if (!this.decayDeathTriggered && !self.dead) {
@@ -269,8 +284,8 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private void csp$saveDecay(CompoundTag nbt, CallbackInfo ci) {
         nbt.putFloat("decay_amount", this.decayAmount);
         nbt.putBoolean("super_invincible", this.superInvincible);
-        nbt.putBoolean("keep_current_health", this.keepCurrentHealth); 
-        nbt.putFloat("invincible_health_value", this.invincibleHealthValue); 
+        nbt.putBoolean("keep_current_health", this.keepCurrentHealth);
+        nbt.putFloat("invincible_health_value", this.invincibleHealthValue);
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
@@ -281,7 +296,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (nbt.contains("super_invincible")) {
             this.superInvincible = nbt.getBoolean("super_invincible");
         }
-
         if (nbt.contains("keep_current_health")) {
             this.keepCurrentHealth = nbt.getBoolean("keep_current_health");
         }
@@ -295,5 +309,17 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (this.superInvincible) {
             ci.cancel();
         }
+    }
+    @Inject(method = "getMaxHealth", at = @At("RETURN"), cancellable = true)
+    private void csp$adjustMaxHealthReturn(CallbackInfoReturnable<Float> cir) {
+        if (csp$isLoginIncomplete()) {
+            return;
+        }
+        if (this.superInvincible) {
+            return;
+        }
+        float originalMax = cir.getReturnValue();
+        float cappedMax = Math.max(1.0f, originalMax - this.decayAmount);
+        cir.setReturnValue(cappedMax);
     }
 }
