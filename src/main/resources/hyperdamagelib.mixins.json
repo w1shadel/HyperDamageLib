@@ -5,20 +5,20 @@
   "plugin": "com.maxwell.hyperdamagelib.HDLMixinPlugin",
   "refmap": "hyperdamagelib.refmap.json",
   "mixins": [
+    "EntityMixin",
     "LivingEntityMixin",
     "ServerLevelMixin",
-    "EntityMixin",
     "ServerPlayerMixin",
     "accessor.LivingEntityAccessor",
     "accessor.SynchedEntityDataAccessor"
   ],
   "client": [
-    "client.MinecraftMixin",
     "client.ClientPacketListenerMixin",
     "client.ItemRendererMixin",
+    "client.ItemTransformMixin",
+    "client.MinecraftMixin",
     "client.PostChainAccessor",
-    "client.PostPassAccessor",
-    "client.ItemTransformMixin"
+    "client.PostPassAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

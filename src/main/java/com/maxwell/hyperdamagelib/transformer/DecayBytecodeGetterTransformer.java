@@ -48,7 +48,20 @@ public class DecayBytecodeGetterTransformer implements ClassFileTransformer {
 
     @Override
     public byte[] transform(Module module, ClassLoader loader, String className, Class<?> classBeingRedefined, ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-        if (!"cpw/mods/cl/ModuleClassLoader".equals(className)) return null;
+        if (className == null) return null;
+        String internalName = className.replace('.', '/');
+        if (classBeingRedefined != null &&
+                (internalName.equals("net/minecraft/world/entity/Entity") ||
+                        internalName.equals("net/minecraft/world/entity/LivingEntity") ||
+                        internalName.equals("net/minecraft/network/syncher/SynchedEntityData") ||
+                        internalName.equals("net/minecraft/server/players/PlayerList") ||
+                        internalName.equals("net/minecraft/server/level/ServerPlayer") ||
+                        internalName.equals("net/minecraft/server/level/ServerLevel"))) {
+            LOGGER.info("[HDL] Intercepting retransform for target class: " + className);
+            java.util.Optional<byte[]> result = transformOptionalBytes(java.util.Optional.of(classfileBuffer), internalName);
+            return result.orElse(null);
+        }
+        if (!"cpw/mods/cl/ModuleClassLoader".equals(internalName)) return null;
         LOGGER.info("Found Target ClassLoader: " + className);
         try {
             byte[] result = transformClass(classfileBuffer, loader);

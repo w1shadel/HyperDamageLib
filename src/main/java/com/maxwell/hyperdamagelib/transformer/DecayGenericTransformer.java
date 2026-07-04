@@ -11,7 +11,6 @@ import org.objectweb.asm.tree.*;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class DecayGenericTransformer {
     static final String ENTITY_METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
@@ -253,7 +252,6 @@ public class DecayGenericTransformer {
         for (MethodNode method : classNode.methods) {
             for (AbstractInsnNode insn : method.instructions) {
                 if (insn instanceof MethodInsnNode methodInsn) {
-
                     if ((insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKEINTERFACE) && shouldWrapInsn) {
                         if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
                             method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
@@ -327,7 +325,6 @@ public class DecayGenericTransformer {
 
                     }
                 } else if (shouldModifyReturn) {
-
                     if (insn.getOpcode() == Opcodes.FRETURN) {
                         if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                             InsnList insnList = new InsnList();
@@ -463,7 +460,8 @@ public class DecayGenericTransformer {
     public static boolean isSubclass(String className, String superClass, boolean isInterface) {
         if (className.equals(superClass) || superClass.equals("java/lang/Object")) return true;
         if (className.equals("java/lang/Object")) return false;
-        if (className.startsWith("java/") ||
+        if (className.contains("__") || className.contains("$$") ||
+                className.startsWith("java/") ||
                 className.startsWith("javax/") ||
                 className.startsWith("sun/") ||
                 className.startsWith("com/sun/") ||
@@ -476,15 +474,23 @@ public class DecayGenericTransformer {
             return false;
         }
         String currentName = className;
-        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        ClassLoader classLoader = DecayGenericTransformer.class.getClassLoader();
+        if (classLoader == null) {
+            classLoader = Thread.currentThread().getContextClassLoader();
+        }
         while (!currentName.equals("java/lang/Object")) {
+            if (currentName.contains("__") || currentName.contains("$$")) {
+                return false;
+            }
             try (InputStream is = classLoader.getResourceAsStream(currentName.concat(".class"))) {
-                ClassReader classReader = new ClassReader(Objects.requireNonNull(is));
-                currentName = classReader.getSuperName();
-                ClassNode classNode = new ClassNode(Opcodes.ASM9);
-                classReader.accept(classNode, ClassReader.EXPAND_FRAMES);
-                if (classNode.visibleAnnotations != null && classNode.visibleAnnotations.stream().anyMatch(annotationNode -> annotationNode.desc.equals(ONLYIN_DESC) && !((String[]) annotationNode.values.get(annotationNode.values.indexOf("value") + 1))[1].equals(FML_DIST))) {
+                if (is == null) {
+                    System.err.println("[] isSubclass search failed for " + currentName + ": ");
                     return false;
+                }
+                ClassReader classReader = new ClassReader(is);
+                currentName = classReader.getSuperName();
+                if (currentName == null) {
+                    currentName = "java/lang/Object";
                 }
                 if (currentName.equals(superClass)) return true;
                 if (isInterface) {
@@ -493,7 +499,6 @@ public class DecayGenericTransformer {
                     }
                 }
             } catch (Throwable e) {
-                System.err.println("[DecayTransformer] isSubclass search failed for " + currentName + ": " + e.getMessage());
                 return false;
             }
         }

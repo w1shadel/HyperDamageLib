@@ -7,7 +7,7 @@ out vec4 fragColor;
 
 uniform vec2 InSize;
 uniform float DecayTime;
-uniform float Intensity; // 0.0 ~ 1.0 (Decay率)
+uniform float Intensity;// 0.0 ~ 1.0 (Decay率)
 
 // 疑似乱数生成
 float hash(vec2 p) {
@@ -21,8 +21,8 @@ float noise(vec2 p) {
     vec2 i = floor(p);
     vec2 f = fract(p);
     vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), u.x),
-    mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), u.x), u.y);
+    return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
 
 // FBM（フラクタルノイズ）
@@ -62,7 +62,7 @@ void main() {
 
     // 2. 浸食領域の大きさを決定（初期の開始位置をより内側「0.46」に寄せて視界を狭めます）
     float erosionStart = mix(0.46, 0.04, visualIntensity);
-    float erosionWidth = 0.28; // グラデーションの幅（少し鋭くして存在感をアピール）
+    float erosionWidth = 0.28;// グラデーションの幅（少し鋭くして存在感をアピール）
 
     // 侵食の影（黒紫）の不透明度
     float shadowFactor = smoothstep(erosionStart, erosionStart + erosionWidth, distortedDist) * visualIntensity;

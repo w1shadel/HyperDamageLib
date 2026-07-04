@@ -40,35 +40,26 @@ public class ErosionSwordItem extends SwordItem {
             AABB searchBox = attacker.getBoundingBox()
                     .expandTowards(lookVector.scale(range))
                     .inflate(width, 1.0D, width);
-
             List<Entity> rawTargets = level.getEntities(attacker, searchBox,
                     entity -> entity != attacker && entity.isAlive() && !entity.isSpectator()
             );
-
             DamageSource erosionSource = DecayDamageUtil.getErosionSource(level, attacker);
             boolean hitAny = false;
-
             for (Entity rawTarget : rawTargets) {
                 Entity actualTarget = rawTarget;
-
                 if (rawTarget instanceof net.minecraftforge.entity.PartEntity<?> part) {
                     Entity parent = part.getParent();
                     if (parent != null) {
                         actualTarget = parent;
                     }
                 }
-
                 if (actualTarget instanceof LivingEntity target) {
                     Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePosition);
                     double distance = toTarget.length();
-
                     if (distance <= range) {
                         double dot = lookVector.dot(toTarget.normalize());
                         if (dot > 0.5D) {
-
-
                             rawTarget.hurt(erosionSource, 20.0F);
-
                             if (level instanceof ServerLevel serverLevel) {
                                 serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 15, 0.3D, 0.3D, 0.3D, 0.1D);
                             }
@@ -82,7 +73,7 @@ public class ErosionSwordItem extends SwordItem {
                 level.playSound(null, attacker.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.5F, 1.2F);
             }
         }
-        return super.onEntitySwing(stack, attacker);
+        return true;
     }
 
     @Override
@@ -91,31 +82,22 @@ public class ErosionSwordItem extends SwordItem {
         if (!level.isClientSide()) {
             if (player instanceof IDecayEntity decayPlayer) {
                 if (player.isShiftKeyDown()) {
-
                     if (!decayPlayer.isSuperInvincible()) {
                         decayPlayer.setKeepCurrentHealth(true);
                         decayPlayer.setSuperInvincible(true);
                         player.displayClientMessage(Component.translatable("message.hyperdamagelib.super_invincible.on_current", player.getHealth()), true);
-
                         level.playSound(null, player.blockPosition(), SoundEvents.CONDUIT_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.7F);
-                    }
-
-                    else if (decayPlayer.isKeepCurrentHealth()) {
+                    } else if (decayPlayer.isKeepCurrentHealth()) {
                         decayPlayer.setKeepCurrentHealth(false);
                         decayPlayer.setSuperInvincible(true);
                         player.displayClientMessage(Component.translatable("message.hyperdamagelib.super_invincible.on_max"), true);
-
                         level.playSound(null, player.blockPosition(), SoundEvents.BEACON_ACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
-                    }
-
-                    else {
+                    } else {
                         decayPlayer.setSuperInvincible(false);
                         decayPlayer.setKeepCurrentHealth(false);
                         player.displayClientMessage(Component.translatable("message.hyperdamagelib.super_invincible.off"), true);
-
                         level.playSound(null, player.blockPosition(), SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
                     }
-
                     if (level instanceof ServerLevel serverLevel) {
                         serverLevel.sendParticles(ParticleTypes.WITCH, player.getX(), player.getY() + 1.0D, player.getZ(), 30, 0.5D, 0.5D, 0.5D, 0.1D);
                     }
@@ -134,7 +116,6 @@ public class ErosionSwordItem extends SwordItem {
                         }
                         hitAny = true;
                     }
-
                     if (hitAny) {
                         player.displayClientMessage(Component.translatable("message.hyperdamagelib.erosion.wave_hit"), true);
                     } else {

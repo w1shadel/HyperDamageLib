@@ -4,6 +4,8 @@ import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.network.NetworkEvent;
@@ -62,6 +64,13 @@ public class ClientboundDecaySyncPacket {
                 decay.setKeepCurrentHealth(this.keepCurrentHealth);
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
                 decay.setSuperInvincible(this.superInvincible);
+                if (this.superInvincible && entity instanceof LivingEntity living) {
+                    living.dead = false;
+                    living.deathTime = 0;
+                    if (living.getPose() == Pose.DYING) {
+                        living.setPose(Pose.STANDING);
+                    }
+                }
             }
         }
     }

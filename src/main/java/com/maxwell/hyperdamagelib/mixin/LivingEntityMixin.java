@@ -4,12 +4,12 @@ import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
-import com.maxwell.hyperdamagelib.util.DecayForceKillHelper;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -76,27 +76,25 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @Override
     public void setDecayAmount(float amount) {
         LivingEntity self = (LivingEntity) (Object) this;
-        this.decayAmount = Math.max(0.0f, Math.min(amount, self.getMaxHealth()));
-        float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
-
+        float originalMax = (float) self.getAttributeValue(
+                net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
+        );
+        this.decayAmount = Math.max(0.0f, Math.min(amount, originalMax));
+        float cappedMax = Math.max(0.0F, originalMax - getDecayAmount());
         float realHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-
         if (realHealth > cappedMax) {
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
-                self.setHealth(cappedMax); 
+                self.setHealth(cappedMax);
             } finally {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
         }
-
-
         csp$syncToTracking();
     }
 
     @Override
     public void addDecayAmount(float amount) {
-
         this.setDecayAmount(this.decayAmount + amount);
         this.decayHoldTicks = 100;
     }
@@ -199,13 +197,10 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (this.superInvincible) {
             return csp$getTargetInvincibleHealth();
         }
-
         float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
-
         if (this.decayHoldTicks > 0 || this.decayAmount > 0.0f) {
             if (value > currentHealth) {
-
                 return Math.min(currentHealth, cappedMax);
             }
         }
@@ -268,14 +263,15 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
-            this.dead = false;
-            this.deathTime = 0;
-            self.setHealth(csp$getTargetInvincibleHealth());
-        }
-        if (!self.level().isClientSide() && this.decayAmount >= self.getMaxHealth()) {
-            if (!this.decayDeathTriggered && !self.dead) {
-                this.decayDeathTriggered = true;
-                DecayForceKillHelper.decayForceKill(self);
+            if (this.dead || this.deathTime > 0) {
+                this.dead = false;
+                this.deathTime = 0;
+                self.setPose(Pose.STANDING);
+                self.setHealth(csp$getTargetInvincibleHealth());
+                csp$syncToTracking();
+
+            } else {
+                self.setHealth(csp$getTargetInvincibleHealth());
             }
         }
     }
@@ -310,6 +306,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             ci.cancel();
         }
     }
+
     @Inject(method = "getMaxHealth", at = @At("RETURN"), cancellable = true)
     private void csp$adjustMaxHealthReturn(CallbackInfoReturnable<Float> cir) {
         if (csp$isLoginIncomplete()) {

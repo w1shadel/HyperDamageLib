@@ -7,7 +7,6 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 public class DecayClientSetup {
     public static void onClientSetup(FMLClientSetupEvent event) {
-        HDL.LOGGER.info("[HDL-DEBUG] Client setup initializing...");
         event.enqueueWork(() -> {
             try {
                 DecayItemAnimationRegistry.register(ModItems.EROSION_SWORD.get(),

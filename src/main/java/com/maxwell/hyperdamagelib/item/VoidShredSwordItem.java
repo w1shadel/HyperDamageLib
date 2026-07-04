@@ -66,7 +66,7 @@ public class VoidShredSwordItem extends SwordItem {
                 level.playSound(null, attacker.blockPosition(), SoundEvents.PLAYER_ATTACK_WEAK, SoundSource.PLAYERS, 0.5F, 1.5F);
             }
         }
-        return super.onEntitySwing(stack, attacker);
+        return true;
     }
 
     @Override

@@ -23,7 +23,7 @@ public class MinecraftMixin {
     public void setScreenMixin(Screen screen, CallbackInfo ci) {
         if (player == null) return;
         if (screen instanceof DeathScreen && player instanceof IDecayEntity decay) {
-            if (decay.isSuperInvincible() && !player.isDeadOrDying()) {
+            if (decay.isSuperInvincible()) {
                 ci.cancel();
             }
         }
