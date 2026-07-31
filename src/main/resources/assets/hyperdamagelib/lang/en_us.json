@@ -22,5 +22,12 @@
   "message.hyperdamagelib.erosion.wave_miss": "§7[Absolute Erosion Wave] Released a shockwave, but no enemies were nearby.",
   "message.hyperdamagelib.void_shred.gravity_pull": "§d[Spatial Gravity Collapse] Pulled in surrounding enemies and shredded space.",
   "message.hyperdamagelib.void_shred.gravity_miss": "§7[Spatial Gravity Collapse] Space warped, but there were no enemies to pull.",
-  "message.hyperdamagelib.void_fall": "§c[Void Rescue] You have been rescued from the Abyss and teleported to a safe location."
+  "message.hyperdamagelib.void_fall": "§c[Void Rescue] You have been rescued from the Abyss and teleported to a safe location.",
+  "item.hyperdamagelib.penetrate_sword": "Penetrate Sword",
+  "item.hyperdamagelib.penetrate_sword.tooltip_1": "§7Left-Click: Pierces the chest of targets ahead, dealing §f18.0 absolute pierce damage§7.",
+  "item.hyperdamagelib.penetrate_sword.tooltip_2": "§cRight-Click: Releases a shockwave dealing §f12.0 pierce damage§c, bypassing defense.",
+  "item.hyperdamagelib.penetrate_sword.tooltip_3": "§d[Bypasses all armor and potions, while respecting target i-frames]",
+  "message.hyperdamagelib.penetrate.wave_hit": "§e[Penetrate Wave] Pierced surrounding targets with absolute force.",
+  "message.hyperdamagelib.penetrate.wave_miss": "§7[Penetrate Wave] Released a shockwave, but no targets were nearby.",
+  "effect.hyperdamagelib.healing_sickness": "Healing Sickness"
 }

@@ -1,6 +1,7 @@
 package com.maxwell.hyperdamagelib;
 
 import com.maxwell.hyperdamagelib.client.util.DecayClientSetup;
+import com.maxwell.hyperdamagelib.init.ModEffects;
 import com.maxwell.hyperdamagelib.init.ModItems;
 import com.maxwell.hyperdamagelib.init.ModTabs;
 import com.maxwell.hyperdamagelib.network.ModMessages;
@@ -23,6 +24,7 @@ public class HDL {
         IEventBus modEventBus = context.getModEventBus();
         ModItems.ITEMS.register(modEventBus);
         ModTabs.CREATIVE_TABS.register(modEventBus);
+        ModEffects.EFFECTS.register(modEventBus);
         modEventBus.addListener(this::addCreativeContents);
         modEventBus.addListener(this::commonSetup);
         if (FMLEnvironment.dist == Dist.CLIENT) {

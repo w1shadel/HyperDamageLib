@@ -19,6 +19,7 @@ import java.util.Objects;
 
 public class DecayForceKillHelper {
     public static void decayForceKill(LivingEntity entity) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         if (entity.level().isClientSide()) return;
         breakBrain(entity);
         if (entity instanceof IDecayEntity decay) {
@@ -43,6 +44,7 @@ public class DecayForceKillHelper {
     }
 
     public static void breakBrain(LivingEntity entity) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         entity.getBrain().clearMemories();
         if (entity instanceof Mob mob) {
             breakGoalSelector(mob.goalSelector);
@@ -52,6 +54,7 @@ public class DecayForceKillHelper {
     }
 
     public static void breakGoalSelector(GoalSelector goalSelector) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         goalSelector.removeAllGoals(goal -> true);
         goalSelector.addGoal(0, new Goal() {
             @Override
@@ -62,6 +65,7 @@ public class DecayForceKillHelper {
     }
 
     public static void dropAllForce(LivingEntity livingEntity) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         if (livingEntity instanceof Player player) {
             player.getInventory().compartments.forEach(itemStacks ->
                     itemStacks.forEach(stack -> clearStackAndDrop(player, stack))
@@ -80,6 +84,7 @@ public class DecayForceKillHelper {
     }
 
     public static void removeFromMemory(Entity victim) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         Level level = victim.level();
         if (level instanceof ServerLevel serverLevel) {
             PersistentEntitySectionManager<Entity> entityManager = serverLevel.entityManager;
@@ -92,6 +97,7 @@ public class DecayForceKillHelper {
 
     @SuppressWarnings("unchecked")
     public static void removeFromPersistentEntityManager(PersistentEntitySectionManager<Entity> manager, Entity victim) {
+        DecayUnsafeHelper.detectAndCrashOnReflection();
         EntitySectionStorage<Entity> sectionStorage = manager.sectionStorage;
         if (manager.isLoaded(victim.getUUID())) {
             long index = SectionPos.of(victim.blockPosition()).asLong();

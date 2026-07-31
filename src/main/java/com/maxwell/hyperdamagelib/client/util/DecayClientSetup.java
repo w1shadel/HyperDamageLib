@@ -70,9 +70,29 @@ public class DecayClientSetup {
                                 .smokeLifetime(1600L)
                                 .build()
                 );
+                DecayItemAnimationRegistry.register(ModItems.PENETRATE_SWORD.get(),
+                        DecayAnimationConfig.builder()
+                                .animator((poseStack, displayContext, stack, time) -> {
+                                    double elapsedSeconds = (time % 3600000L) / 1000.0;
+                                    float pulse = (float) (Math.sin(elapsedSeconds * 6.0) * 0.05);
+                                    poseStack.scale(1.0F - pulse, 1.0F + pulse, 1.0F - pulse);
+                                })
+                                .aura(true)
+                                .auraColor(255, 215, 0, 160)
+                                .auraScale(0.35F)
+                                .auraRotateSpeed(35.0F)
+                                .auraPulse(0.5F, 0.10F)
+                                .auraShape(DecayAnimationConfig.AuraShape.DIAMOND)
+                                .smoke(true)
+                                .smokeDensity(5)
+                                .smokeSize(0.6F)
+                                .smokeLifetime(1200L)
+                                .build()
+                );
             } catch (Exception e) {
                 HDL.LOGGER.error("[HDL-DEBUG] Failed to register animator", e);
             }
         });
+
     }
 }

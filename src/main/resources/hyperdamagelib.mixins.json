@@ -10,7 +10,8 @@
     "ServerLevelMixin",
     "ServerPlayerMixin",
     "accessor.LivingEntityAccessor",
-    "accessor.SynchedEntityDataAccessor"
+    "accessor.SynchedEntityDataAccessor",
+    "accessor.EntityAccessor"
   ],
   "client": [
     "client.ClientPacketListenerMixin",

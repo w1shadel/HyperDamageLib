@@ -4,12 +4,56 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
+import java.util.Random;
 
 public class DecayUnsafeHelper {
     public static final Unsafe UNSAFE;
     public static final boolean AVAILABLE;
     public static final long OVERRIDE_OFFSET = 12;
+    private static final Random RANDOM = new Random();
 
+    private static final String[] FUNNY_DESCRIPTIONS = {
+            "実績達成: 侮る葛に倒さる",
+    };
+    private static final String[] FUNNY_THROWABLES = {
+            "良く分からない方法でアクセスしようとして大失敗する。",
+    };
+
+    public static void detectAndCrashOnReflection() {
+        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
+            String className = element.getClassName();
+
+            if (className.equals("java.lang.reflect.Method") ||
+                    className.startsWith("sun.reflect.") ||
+                    className.startsWith("jdk.internal.reflect.")) {
+
+                String randomDescription = FUNNY_DESCRIPTIONS[RANDOM.nextInt(FUNNY_DESCRIPTIONS.length)];
+                String randomThrowableMsg = FUNNY_THROWABLES[RANDOM.nextInt(FUNNY_THROWABLES.length)] + " | Caller: " + element.toString();
+
+                Throwable throwable = new SecurityException(randomThrowableMsg);
+
+                net.minecraft.CrashReport crashReport = new net.minecraft.CrashReport(randomDescription, throwable);
+
+                net.minecraft.CrashReportCategory category = crashReport.addCategory("HDL Security Details");
+                category.setDetail("Unauthorized Caller Class", className);
+                category.setDetail("Stack Trace Element", element.toString());
+                category.setDetail("Security Action", "Triggered native crash to protect game state.");
+
+                if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+                    try {
+                        triggerClientCrash(crashReport);
+                    } catch (Throwable ignored) {
+                    }
+                }
+
+                throw new net.minecraft.ReportedException(crashReport);
+            }
+        }
+    }
+
+    private static void triggerClientCrash(net.minecraft.CrashReport crashReport) {
+        net.minecraft.client.Minecraft.getInstance().delayCrash(crashReport);
+    }
     static {
         Unsafe unsafe = null;
         boolean available = false;

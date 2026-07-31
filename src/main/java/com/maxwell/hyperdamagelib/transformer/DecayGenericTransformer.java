@@ -62,6 +62,77 @@ public class DecayGenericTransformer {
         if (classNode.name.equals("net/minecraft/world/entity/LivingEntity") ||
                 isSubclass(classNode.name, "net/minecraft/world/entity/LivingEntity", false)) {
             for (MethodNode method : classNode.methods) {
+                if ((method.name.equals("removeEffect") || method.name.equals("m_21195_")) &&
+                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffect;)Z")) {
+                    InsnList insnList = new InsnList();
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            ENTITY_METHODS,
+                            "shouldPreventEffectRemoval",
+                            "(Lnet/minecraft/world/effect/MobEffect;)Z",
+                            false
+                    ));
+                    LabelNode label = new LabelNode();
+                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
+                    insnList.add(new InsnNode(Opcodes.ICONST_0));
+                    insnList.add(new InsnNode(Opcodes.IRETURN));
+                    insnList.add(label);
+                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+                    method.maxStack = Math.max(method.maxStack, 1);
+                    modified = true;
+                }
+                if ((method.name.equals("removeAllEffects") || method.name.equals("m_21219_")) &&
+                        method.desc.equals("()Z")) {
+                    InsnList headInsns = new InsnList();
+                    headInsns.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    headInsns.add(new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            ENTITY_METHODS,
+                            "preserveDecayEffects",
+                            "(Lnet/minecraft/world/entity/LivingEntity;)V",
+                            false
+                    ));
+                    method.instructions.insertBefore(method.instructions.getFirst(), headInsns);
+                    for (AbstractInsnNode insn : method.instructions.toArray()) {
+                        if (insn.getOpcode() == Opcodes.IRETURN) {
+                            InsnList restoreInsns = new InsnList();
+                            restoreInsns.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                            restoreInsns.add(new MethodInsnNode(
+                                    Opcodes.INVOKESTATIC,
+                                    ENTITY_METHODS,
+                                    "restoreDecayEffects",
+                                    "(Lnet/minecraft/world/entity/LivingEntity;)V",
+                                    false
+                            ));
+                            method.instructions.insertBefore(insn, restoreInsns);
+                        }
+                    }
+                    method.maxStack = Math.max(method.maxStack, 1);
+                    modified = true;
+                }
+                if ((method.name.equals("addEffect") || method.name.equals("m_7292_")) &&
+                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z")) {
+                    InsnList insnList = new InsnList();
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            ENTITY_METHODS,
+                            "handleForceAddEffect",
+                            "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z",
+                            false
+                    ));
+                    LabelNode label = new LabelNode();
+                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
+                    insnList.add(new InsnNode(Opcodes.ICONST_1));
+                    insnList.add(new InsnNode(Opcodes.IRETURN));
+                    insnList.add(label);
+                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+                    method.maxStack = Math.max(method.maxStack, 3);
+                    modified = true;
+                }
                 if ((method.name.equals("die") || method.name.equals("m_6667_")) &&
                         method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
                     InsnList insnList = new InsnList();

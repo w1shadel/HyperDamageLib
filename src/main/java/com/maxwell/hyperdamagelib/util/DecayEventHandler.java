@@ -1,7 +1,6 @@
 package com.maxwell.hyperdamagelib.util;
 
 import com.maxwell.hyperdamagelib.HDL;
-import com.maxwell.hyperdamagelib.item.ErosionSwordItem;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import net.minecraft.network.chat.Component;
@@ -9,8 +8,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.event.entity.living.LivingAttackEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
-import net.minecraftforge.event.entity.player.AttackEntityEvent;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -33,18 +32,36 @@ public class DecayEventHandler {
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
-    public static void onPlayerAttack(AttackEntityEvent event) {
-        if (event.getTarget() instanceof IDecayEntity decayTarget && event.getTarget() instanceof LivingEntity livingTarget) {
-            Player attacker = event.getEntity();
-            ItemStack heldItem = attacker.getMainHandItem();
-            if (heldItem.getItem() instanceof ErosionSwordItem) {
-                float maxHp = livingTarget.getMaxHealth();
-                if (maxHp >= 3.0E38F || Float.isInfinite(maxHp) || Float.isNaN(maxHp)) {
-                    com.maxwell.hyperdamagelib.util.DecayForceKillHelper.decayForceKill(livingTarget);
-                    livingTarget.level().broadcastEntityEvent(livingTarget, (byte) 2);
-                    return;
+    public static void onLivingAttack(LivingAttackEvent event) {
+        net.minecraft.world.damagesource.DamageSource source = event.getSource();
+        if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE)) {
+            return;
+        }
+        net.minecraft.world.entity.Entity attacker = source.getEntity();
+        LivingEntity victim = event.getEntity();
+        if (attacker instanceof LivingEntity livingAttacker) {
+            ItemStack heldItem = livingAttacker.getMainHandItem();
+            if (heldItem.getItem() instanceof com.maxwell.hyperdamagelib.item.PenetrateSwordItem) {
+                event.setCanceled(true);
+                if (!livingAttacker.level().isClientSide()) {
+                    com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] onLivingAttack intercepted. Swung PenetrateSword.");
+                    float originalDamage = event.getAmount();
+                    float damage = originalDamage > 0 ? originalDamage : 18.0F;
+                    String customMessage = "%victim% was pierced through the chest by %attacker%'s Absolute Thrust!";
+                    net.minecraft.world.damagesource.DamageSource penetrateSource =
+                            DecayDamageUtil.getPenetrateSource(livingAttacker.level(), livingAttacker, customMessage);
+                    victim.hurt(penetrateSource, damage);
+                    net.minecraft.world.effect.MobEffectInstance activeSickness = victim.getEffect(com.maxwell.hyperdamagelib.init.ModEffects.HEALING_SICKNESS.get());
+                    int nextAmp = 0;
+                    if (activeSickness != null) {
+                        nextAmp = Math.min(2, activeSickness.getAmplifier() + 1);
+                    }
+                    net.minecraft.world.effect.MobEffectInstance sicknessInstance = new net.minecraft.world.effect.MobEffectInstance(
+                            com.maxwell.hyperdamagelib.init.ModEffects.HEALING_SICKNESS.get(), 160, nextAmp
+                    );
+                    sicknessInstance.setCurativeItems(java.util.List.of());
+                    DecayDamageUtil.forceAddEffect(victim, sicknessInstance, livingAttacker);
                 }
-                livingTarget.level().broadcastEntityEvent(livingTarget, (byte) 2);
             }
         }
     }
@@ -296,13 +313,13 @@ public class DecayEventHandler {
         boolean isRemoved = player.isRemoved();
         net.minecraft.world.entity.Entity.RemovalReason removalReason = player.getRemovalReason();
         boolean isAddedToWorld = player.isAddedToWorld();
-        boolean hasNoSugarErased = false;
+        boolean hasErased = false;
         try {
             for (java.lang.reflect.Field field : player.getClass().getDeclaredFields()) {
                 if (field.getName().toLowerCase().contains("erase")) {
                     if (field.getType() == boolean.class) {
                         field.setAccessible(true);
-                        hasNoSugarErased = field.getBoolean(player);
+                        hasErased = field.getBoolean(player);
                     }
                 }
             }
@@ -317,7 +334,7 @@ public class DecayEventHandler {
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§fdead (Field): " + (rawDead ? "§cTRUE" : "§aFALSE") + " | deathTime: " + deathTime));
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§fisRemoved(): " + isRemoved + " | Reason: " + removalReason));
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§fisAddedToWorld: " + isAddedToWorld));
-        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§fNoSugar Erased: " + (hasNoSugarErased ? "§cTRUE" : "§aFALSE")));
+        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§f Erased: " + (hasErased ? "§cTRUE" : "§aFALSE")));
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§d================================"));
     }
 }

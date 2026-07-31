@@ -41,7 +41,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private float invincibleHealthValue = 20.0f;
 
     @Unique
-    private boolean csp$isLoginIncomplete() {
+    private boolean decay$isLoginIncomplete() {
         LivingEntity self = (LivingEntity) (Object) this;
         if (self instanceof ServerPlayer player) {
             return player.connection == null;
@@ -50,7 +50,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Unique
-    private float csp$getTargetInvincibleHealth() {
+    private float decay$getTargetInvincibleHealth() {
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.keepCurrentHealth) {
             return this.invincibleHealthValue;
@@ -90,7 +90,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
         }
-        csp$syncToTracking();
+        decay$syncToTracking();
     }
 
     @Override
@@ -118,7 +118,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             }
             self.setHealth(this.invincibleHealthValue);
         }
-        csp$syncToTracking();
+        decay$syncToTracking();
     }
 
     @Override
@@ -160,7 +160,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Unique
-    private void csp$syncToTracking() {
+    private void decay$syncToTracking() {
         LivingEntity self = (LivingEntity) (Object) this;
         if (self.level() != null && !self.level().isClientSide()) {
             ModMessages.INSTANCE.send(
@@ -171,15 +171,15 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
-    private void csp$preventHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    private void decay$preventHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (this.superInvincible) {
             cir.setReturnValue(false);
         }
     }
 
     @Inject(method = "die", at = @At("HEAD"), cancellable = true)
-    private void csp$preventDie(DamageSource source, CallbackInfo ci) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$preventDie(DamageSource source, CallbackInfo ci) {
+        if (decay$isLoginIncomplete()) {
             ci.cancel();
             return;
         }
@@ -189,13 +189,13 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @ModifyVariable(method = "setHealth", at = @At("HEAD"), argsOnly = true)
-    private float csp$modifySetHealthArg(float value) {
-        if (csp$isLoginIncomplete()) {
+    private float decay$modifySetHealthArg(float value) {
+        if (decay$isLoginIncomplete()) {
             return value;
         }
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
-            return csp$getTargetInvincibleHealth();
+            return decay$getTargetInvincibleHealth();
         }
         float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
@@ -208,8 +208,8 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "isAlive", at = @At("HEAD"), cancellable = true)
-    private void csp$adjustIsAlive(CallbackInfoReturnable<Boolean> cir) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$adjustIsAlive(CallbackInfoReturnable<Boolean> cir) {
+        if (decay$isLoginIncomplete()) {
             return;
         }
         if (this.superInvincible) {
@@ -223,8 +223,8 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "isDeadOrDying", at = @At("HEAD"), cancellable = true)
-    private void csp$adjustIsDeadOrDying(CallbackInfoReturnable<Boolean> cir) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$adjustIsDeadOrDying(CallbackInfoReturnable<Boolean> cir) {
+        if (decay$isLoginIncomplete()) {
             return;
         }
         if (this.superInvincible) {
@@ -238,13 +238,13 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "getHealth", at = @At("HEAD"), cancellable = true)
-    private void csp$adjustHealthReturn(CallbackInfoReturnable<Float> cir) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$adjustHealthReturn(CallbackInfoReturnable<Float> cir) {
+        if (decay$isLoginIncomplete()) {
             return;
         }
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
-            cir.setReturnValue(csp$getTargetInvincibleHealth());
+            cir.setReturnValue(decay$getTargetInvincibleHealth());
             return;
         }
         if (this.decayAmount >= self.getMaxHealth()) {
@@ -257,8 +257,8 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "baseTick", at = @At("HEAD"))
-    private void csp$tickDecayDeath(CallbackInfo ci) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$tickDecayDeath(CallbackInfo ci) {
+        if (decay$isLoginIncomplete()) {
             return;
         }
         LivingEntity self = (LivingEntity) (Object) this;
@@ -267,17 +267,17 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 this.dead = false;
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
-                self.setHealth(csp$getTargetInvincibleHealth());
-                csp$syncToTracking();
+                self.setHealth(decay$getTargetInvincibleHealth());
+                decay$syncToTracking();
 
             } else {
-                self.setHealth(csp$getTargetInvincibleHealth());
+                self.setHealth(decay$getTargetInvincibleHealth());
             }
         }
     }
 
     @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
-    private void csp$saveDecay(CompoundTag nbt, CallbackInfo ci) {
+    private void decay$saveDecay(CompoundTag nbt, CallbackInfo ci) {
         nbt.putFloat("decay_amount", this.decayAmount);
         nbt.putBoolean("super_invincible", this.superInvincible);
         nbt.putBoolean("keep_current_health", this.keepCurrentHealth);
@@ -285,7 +285,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
-    private void csp$loadDecay(CompoundTag nbt, CallbackInfo ci) {
+    private void decay$loadDecay(CompoundTag nbt, CallbackInfo ci) {
         if (nbt.contains("decay_amount")) {
             this.decayAmount = nbt.getFloat("decay_amount");
         }
@@ -301,15 +301,15 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     }
 
     @Inject(method = "dropAllDeathLoot", at = @At("HEAD"), cancellable = true)
-    private void csp$preventDropAllDeathLoot(DamageSource source, CallbackInfo ci) {
+    private void decay$preventDropAllDeathLoot(DamageSource source, CallbackInfo ci) {
         if (this.superInvincible) {
             ci.cancel();
         }
     }
 
     @Inject(method = "getMaxHealth", at = @At("RETURN"), cancellable = true)
-    private void csp$adjustMaxHealthReturn(CallbackInfoReturnable<Float> cir) {
-        if (csp$isLoginIncomplete()) {
+    private void decay$adjustMaxHealthReturn(CallbackInfoReturnable<Float> cir) {
+        if (decay$isLoginIncomplete()) {
             return;
         }
         if (this.superInvincible) {

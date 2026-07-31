@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ItemTransform.class)
 public class ItemTransformMixin {
     @Inject(method = "apply", at = @At("TAIL"))
-    private void csp$onApplyTail(boolean leftHand, PoseStack poseStack, CallbackInfo ci) {
+    private void decay$onApplyTail(boolean leftHand, PoseStack poseStack, CallbackInfo ci) {
         ItemStack stack = DecayClientAnimationHelper.CURRENT_RENDER_STACK.get();
         ItemDisplayContext displayContext = DecayClientAnimationHelper.CURRENT_RENDER_CONTEXT.get();
         if (stack != null && !stack.isEmpty() && displayContext != null) {

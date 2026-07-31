@@ -9,6 +9,7 @@ import net.minecraft.world.damagesource.DamageType;
 public class ModDamageTypes {
     public static final ResourceKey<DamageType> EROSION = register("erosion");
     public static final ResourceKey<DamageType> VOID_SHRED = register("void_shred");
+    public static final ResourceKey<DamageType> PENETRATE = register("penetrate");
 
     private static ResourceKey<DamageType> register(String name) {
         return ResourceKey.create(Registries.DAMAGE_TYPE, new ResourceLocation("hyperdamagelib", name));

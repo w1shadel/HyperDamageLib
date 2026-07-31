@@ -22,5 +22,12 @@
   "message.hyperdamagelib.erosion.wave_miss": "§7[絶対侵食波] 衝撃波を放ちましたが、周囲に敵がいませんでした。",
   "message.hyperdamagelib.void_shred.gravity_pull": "§d[空間重力崩壊] 周囲の敵を吸引し、空間を引き裂きました。",
   "message.hyperdamagelib.void_shred.gravity_miss": "§7[空間重力崩壊] 空間が歪みましたが、引き寄せる敵がいませんでした。",
-  "message.hyperdamagelib.void_fall": "§c[Void Rescue] 奈落から救出され、安全な位置に転送されました。"
+  "message.hyperdamagelib.void_fall": "§c[Void Rescue] 奈落から救出され、安全な位置に転送されました。",
+  "item.hyperdamagelib.penetrate_sword": "貫通の聖剣",
+  "item.hyperdamagelib.penetrate_sword.tooltip_1": "§7左クリック：前方の対象を突き刺し、§f18.0 の絶対貫通ダメージ§7を与える。",
+  "item.hyperdamagelib.penetrate_sword.tooltip_2": "§c右クリック：防御を完全に貫通する §f12.0 の衝撃波§cを周囲に放つ。",
+  "item.hyperdamagelib.penetrate_sword.tooltip_3": "§d[無敵時間を遵守しつつ、あらゆるアーマーや耐性を無効化]",
+  "message.hyperdamagelib.penetrate.wave_hit": "§e[絶対貫通波] 絶対的な力で周囲の存在を貫きました。",
+  "message.hyperdamagelib.penetrate.wave_miss": "§7[絶対貫通波] 衝撃波を放ちましたが、周囲に敵がいませんでした。",
+  "effect.hyperdamagelib.healing_sickness": "重傷"
 }
