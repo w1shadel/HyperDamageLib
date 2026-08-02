@@ -23,6 +23,7 @@ public class DecayUnsafeHelper {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         int helperIndex = -1;
 
+        // 1. この検知器自身のスタックインデックスを検索
         for (int i = 0; i < stackTrace.length; i++) {
             if (stackTrace[i].getClassName().equals("com.maxwell.hyperdamagelib.util.DecayUnsafeHelper") &&
                     stackTrace[i].getMethodName().equals("detectAndCrashOnReflection")) {
@@ -31,37 +32,48 @@ public class DecayUnsafeHelper {
             }
         }
 
+        if (helperIndex != -1) {
+            StackTraceElement firstExternalCaller = null;
 
-        if (helperIndex != -1 && helperIndex + 2 < stackTrace.length) {
-            StackTraceElement caller = stackTrace[helperIndex + 2];
-            String className = caller.getClassName();
-
-            if (className.equals("java.lang.reflect.Method") ||
-                    className.startsWith("sun.reflect.") ||
-                    className.startsWith("jdk.internal.reflect.") ||
-                    className.startsWith("java.lang.invoke.")) { 
-
-                String randomDescription = FUNNY_DESCRIPTIONS[RANDOM.nextInt(FUNNY_DESCRIPTIONS.length)];
-
-                String randomThrowableMsg = FUNNY_THROWABLES[RANDOM.nextInt(FUNNY_THROWABLES.length)] + " | Caller: " + caller.toString();
-
-                Throwable throwable = new SecurityException(randomThrowableMsg);
-
-                net.minecraft.CrashReport crashReport = new net.minecraft.CrashReport(randomDescription, throwable);
-
-                net.minecraft.CrashReportCategory category = crashReport.addCategory("HDL Security Details");
-                category.setDetail("Unauthorized Caller Class", className);
-                category.setDetail("Stack Trace Element", caller.toString());
-                category.setDetail("Security Action", "Triggered native crash to protect game state.");
-
-                if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
-                    try {
-                        triggerClientCrash(crashReport);
-                    } catch (Throwable ignored) {
-                    }
+            // 2. 【修正】検知器より下に向かって、自作Mod「以外の」最初の呼び出し元を探す
+            for (int i = helperIndex + 1; i < stackTrace.length; i++) {
+                String className = stackTrace[i].getClassName();
+                if (!className.startsWith("com.maxwell.hyperdamagelib.")) {
+                    firstExternalCaller = stackTrace[i];
+                    break;
                 }
+            }
 
-                throw new net.minecraft.ReportedException(crashReport);
+            // 3. 自作Modの境界線を越えた直近の外部クラスがリフレクションかどうかを判定する
+            if (firstExternalCaller != null) {
+                String className = firstExternalCaller.getClassName();
+
+                if (className.equals("java.lang.reflect.Method") ||
+                        className.startsWith("sun.reflect.") ||
+                        className.startsWith("jdk.internal.reflect.") ||
+                        className.startsWith("java.lang.invoke.")) {
+
+                    String randomDescription = FUNNY_DESCRIPTIONS[RANDOM.nextInt(FUNNY_DESCRIPTIONS.length)];
+                    String randomThrowableMsg = FUNNY_THROWABLES[RANDOM.nextInt(FUNNY_THROWABLES.length)] + " | Caller: " + firstExternalCaller.toString();
+
+                    Throwable throwable = new SecurityException(randomThrowableMsg);
+
+                    net.minecraft.CrashReport crashReport = new net.minecraft.CrashReport(randomDescription, throwable);
+
+                    net.minecraft.CrashReportCategory category = crashReport.addCategory("HDL Security Details");
+                    category.setDetail("Unauthorized Caller Class", className);
+                    category.setDetail("Stack Trace Element", firstExternalCaller.toString());
+                    category.setDetail("Security Action", "Triggered native crash to protect game state.");
+
+                    if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
+                        try {
+                            triggerClientCrash(crashReport);
+                        } catch (Throwable ignored) {
+                        }
+                    }
+
+                    throw new net.minecraft.ReportedException(crashReport);
+                }
             }
         }
     }

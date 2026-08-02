@@ -555,7 +555,6 @@ public class DecayGenericTransformer {
             }
             try (InputStream is = classLoader.getResourceAsStream(currentName.concat(".class"))) {
                 if (is == null) {
-                    System.err.println("[] isSubclass search failed for " + currentName + ": ");
                     return false;
                 }
                 ClassReader classReader = new ClassReader(is);

@@ -296,9 +296,46 @@ public class DecayEventHandler {
                                     return 1;
                                 })
                         )
+                        // 【検証用コマンド1】コンパイル時の直接呼び出しテスト
+                        .then(net.minecraft.commands.Commands.literal("test_direct")
+                                .executes(context -> {
+                                    net.minecraft.server.level.ServerPlayer player = context.getSource().getPlayer();
+                                    if (player != null) {
+                                        // 正常な直接アクセスを試行
+                                        com.maxwell.hyperdamagelib.util.DecayDamageUtil.getErosionSource(player.level(), player);
+                                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[HDL Test] 直接呼び出しの通過に成功しました（クラッシュしなければ正常です）。"));
+                                    }
+                                    return 1;
+                                })
+                        )
+                        // 【検証用コマンド2】意図的なリフレクション呼び出しテスト
+                        .then(net.minecraft.commands.Commands.literal("test_reflection")
+                                .executes(context -> {
+                                    net.minecraft.server.level.ServerPlayer player = context.getSource().getPlayer();
+                                    if (player != null) {
+                                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[HDL Test] リフレクションでの呼び出しを試行します。クラッシュすれば成功です..."));
+
+                                        // 意図的にリフレクション（文字列指定）でアクセスさせる
+                                        try {
+                                            java.lang.reflect.Method method = com.maxwell.hyperdamagelib.util.DecayDamageUtil.class.getMethod(
+                                                    "getErosionSource",
+                                                    net.minecraft.world.level.Level.class,
+                                                    net.minecraft.world.entity.Entity.class
+                                            );
+                                            // リフレクション経由で実行（ここでクラッシュがトリガーされます）
+                                            method.invoke(null, player.level(), player);
+                                        } catch (Exception e) {
+                                            // ReportedException などの実行時例外は InvocationTargetException に包まれてスローされる場合があります。
+                                            // 万が一クラッシュせずにキャッチしてしまった場合はログを出力します。
+                                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cキャッチされました: " + e.getMessage()));
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                    return 1;
+                                })
+                        )
         );
     }
-
     private static void performInspection(net.minecraft.server.level.ServerPlayer player) {
         if (player == null) return;
         com.maxwell.hyperdamagelib.util.IDecayEntity decay = (com.maxwell.hyperdamagelib.util.IDecayEntity) player;
