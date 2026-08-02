@@ -1,6 +1,7 @@
 package com.maxwell.hyperdamagelib.init;
 
 import com.maxwell.hyperdamagelib.HDL;
+import com.maxwell.hyperdamagelib.item.DecaySword;
 import com.maxwell.hyperdamagelib.item.ErosionSwordItem;
 import com.maxwell.hyperdamagelib.item.PenetrateSwordItem;
 import com.maxwell.hyperdamagelib.item.VoidShredSwordItem;
@@ -20,5 +21,8 @@ public class ModItems {
     );
     public static final RegistryObject<Item> PENETRATE_SWORD = ITEMS.register("penetrate_sword", () ->
             new PenetrateSwordItem(new Item.Properties().rarity(Rarity.EPIC).fireResistant())
+    );
+    public static final RegistryObject<Item> DECAYSWORD = ITEMS.register("decay_sword", () ->
+            new DecaySword(new Item.Properties().rarity(Rarity.EPIC).fireResistant())
     );
 }

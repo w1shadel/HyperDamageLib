@@ -29,5 +29,8 @@
   "item.hyperdamagelib.penetrate_sword.tooltip_3": "§d[Bypasses all armor and potions, while respecting target i-frames]",
   "message.hyperdamagelib.penetrate.wave_hit": "§e[Penetrate Wave] Pierced surrounding targets with absolute force.",
   "message.hyperdamagelib.penetrate.wave_miss": "§7[Penetrate Wave] Released a shockwave, but no targets were nearby.",
+  "item.hyperdamagelib.decay_sword": "The Corroding Netherite Sword",
+  "message.hyperdamagelib.decaysword.wave_hit": "§e[Anti-Sacred Piercing Wave] It pierced the surrounding beings with anti-sacred power.",
+  "message.hyperdamagelib.decaysword.wave_miss": "§7[Anti-Sacred Penetrating Wave] A shockwave was released, but there were no enemies nearby.",
   "effect.hyperdamagelib.healing_sickness": "Healing Sickness"
 }

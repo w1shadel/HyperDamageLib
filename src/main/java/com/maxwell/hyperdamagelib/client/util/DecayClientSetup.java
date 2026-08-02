@@ -89,6 +89,25 @@ public class DecayClientSetup {
                                 .smokeLifetime(1200L)
                                 .build()
                 );
+                DecayItemAnimationRegistry.register(ModItems.DECAYSWORD.get(),
+                        DecayAnimationConfig.builder()
+                                .animator((poseStack, displayContext, stack, time) -> {
+                                    double elapsedSeconds = (time % 3600000L) / 1000.0;
+                                    float pulse = (float) (Math.sin(elapsedSeconds * 2.2) * 0.15);
+                                    poseStack.scale(1.2F - pulse, 0.1F + pulse, 0.5F - pulse);
+                                })
+                                .aura(true)
+                                .auraColor(255, 200, 0, 160)
+                                .auraScale(0.80F)
+                                .auraRotateSpeed(315.0F)
+                                .auraPulse(0.5F, 0.10F)
+                                .auraShape(DecayAnimationConfig.AuraShape.BLACK_HOLE)
+                                .smoke(true)
+                                .smokeDensity(20)
+                                .smokeSize(0.6F)
+                                .smokeLifetime(1200L)
+                                .build()
+                );
             } catch (Exception e) {
                 HDL.LOGGER.error("[HDL-DEBUG] Failed to register animator", e);
             }

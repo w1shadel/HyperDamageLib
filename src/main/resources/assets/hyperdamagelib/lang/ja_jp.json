@@ -29,5 +29,8 @@
   "item.hyperdamagelib.penetrate_sword.tooltip_3": "§d[無敵時間を遵守しつつ、あらゆるアーマーや耐性を無効化]",
   "message.hyperdamagelib.penetrate.wave_hit": "§e[絶対貫通波] 絶対的な力で周囲の存在を貫きました。",
   "message.hyperdamagelib.penetrate.wave_miss": "§7[絶対貫通波] 衝撃波を放ちましたが、周囲に敵がいませんでした。",
+  "item.hyperdamagelib.decay_sword": "浸食されゆくネザライトの剣",
+  "message.hyperdamagelib.decaysword.wave_hit": "§e[反神聖貫通波] 反神聖的な力で周囲の存在を貫きました。",
+  "message.hyperdamagelib.decaysword.wave_miss": "§7[反神聖貫通波] 衝撃波を放ちましたが、周囲に敵がいませんでした。",
   "effect.hyperdamagelib.healing_sickness": "重傷"
 }
