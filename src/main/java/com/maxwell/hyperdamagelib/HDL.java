@@ -36,32 +36,6 @@ public class HDL {
         return new ResourceLocation(MODID, path);
     }
 
-    public static void verifyAndRetransform() {
-        if (DecayBootstrap.instrumentation == null) return;
-        try {
-            java.util.List<Class<?>> classesToRetransform = new java.util.ArrayList<>();
-            for (Class<?> clazz : DecayBootstrap.instrumentation.getAllLoadedClasses()) {
-                String name = clazz.getName();
-                if (name.equals("net.minecraft.world.entity.Entity") ||
-                        name.equals("net.minecraft.world.entity.LivingEntity") ||
-                        name.equals("net.minecraft.network.syncher.SynchedEntityData") ||
-                        name.equals("net.minecraft.server.players.PlayerList") ||
-                        name.equals("net.minecraft.server.level.ServerPlayer") ||
-                        name.equals("net.minecraft.server.level.ServerLevel")) {
-                    if (DecayBootstrap.instrumentation.isModifiableClass(clazz)) {
-                        classesToRetransform.add(clazz);
-                    }
-                }
-            }
-            if (!classesToRetransform.isEmpty()) {
-                Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
-                DecayBootstrap.instrumentation.retransformClasses(classArray);
-                HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
-            }
-        } catch (Exception e) {
-            HDL.LOGGER.error("[HDL] Failed to bulk-retransform target classes", e);
-        }
-    }
 
     private void addCreativeContents(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event) {
         if (event.getTab() == ModTabs.PRIME_TAB.get()) {
@@ -71,6 +45,6 @@ public class HDL {
 
     private void commonSetup(final net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent event) {
         event.enqueueWork(ModMessages::register);
-        verifyAndRetransform();
+        DecayBootstrap.verifyAndRetransform();
     }
 }

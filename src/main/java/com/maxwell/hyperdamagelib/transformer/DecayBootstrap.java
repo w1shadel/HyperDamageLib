@@ -30,7 +30,7 @@ public final class DecayBootstrap {
     private static final String AGENT_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayAgent.class";
     private static final String BRIDGE_CLASS = "com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge";
     private static final String BRIDGE_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayBytecodeBridge.class";
-    public static volatile Instrumentation instrumentation = null;
+    static volatile Instrumentation instrumentation = null;
     public static volatile boolean LAUNCH_PLUGIN_AVAILABLE = false;
     private static volatile boolean STARTED = false;
 
@@ -153,6 +153,34 @@ public final class DecayBootstrap {
         try (InputStream in = DecayAgent.class.getClassLoader().getResourceAsStream(resource)) {
             if (in == null) throw new IOException("Resource not found: " + resource);
             return in.readAllBytes();
+        }
+    }
+
+    public static void verifyAndRetransform() {
+        if (instrumentation == null) return;
+        try {
+            java.util.List<Class<?>> classesToRetransform = new java.util.ArrayList<>();
+            for (Class<?> clazz : instrumentation.getAllLoadedClasses()) {
+                String name = clazz.getName();
+                if (name.equals("net.minecraft.world.entity.Entity") ||
+                        name.equals("net.minecraft.world.entity.LivingEntity") ||
+                        name.equals("net.minecraft.network.syncher.SynchedEntityData") ||
+                        name.equals("net.minecraft.server.players.PlayerList") ||
+                        name.equals("net.minecraft.server.level.ServerPlayer") ||
+                        name.equals("net.minecraft.server.level.ServerLevel")) {
+                    if (instrumentation.isModifiableClass(clazz)) {
+                        classesToRetransform.add(clazz);
+                    }
+                }
+            }
+            if (!classesToRetransform.isEmpty()) {
+                Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
+                instrumentation.retransformClasses(classArray);
+                // ログ出力の参照を補正
+                com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
+            }
+        } catch (Exception e) {
+            com.maxwell.hyperdamagelib.HDL.LOGGER.error("[HDL] Failed to bulk-retransform target classes", e);
         }
     }
 }

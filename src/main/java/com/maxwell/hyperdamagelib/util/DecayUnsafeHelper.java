@@ -113,6 +113,7 @@ public class DecayUnsafeHelper {
     }
 
     public static boolean forceSetAccessible(AccessibleObject accessibleObject) {
+        detectAndCrashOnReflection();
         if (accessibleObject.trySetAccessible()) {
             return true;
         }
