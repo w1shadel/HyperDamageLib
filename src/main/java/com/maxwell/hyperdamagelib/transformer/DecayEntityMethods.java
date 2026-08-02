@@ -17,12 +17,12 @@ public class DecayEntityMethods {
     private static final ThreadLocal<java.util.List<MobEffectInstance>> PRESERVED_EFFECTS = ThreadLocal.withInitial(java.util.ArrayList::new);
 
     public static boolean shouldPreventEffectRemoval(MobEffect effect) {
-        
+
         return effect instanceof DecayMobEffect;
     }
 
     public static void preserveDecayEffects(LivingEntity entity) {
-        
+
         if (entity.level().isClientSide()) return;
         java.util.List<MobEffectInstance> list = PRESERVED_EFFECTS.get();
         list.clear();
@@ -34,7 +34,7 @@ public class DecayEntityMethods {
     }
 
     public static void restoreDecayEffects(LivingEntity entity) {
-        
+
         if (entity.level().isClientSide()) return;
         java.util.List<MobEffectInstance> list = PRESERVED_EFFECTS.get();
         if (!list.isEmpty()) {
@@ -46,7 +46,7 @@ public class DecayEntityMethods {
     }
 
     public static float handleSetHealth(LivingEntity entity, float health) {
-        
+
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return decay.getInvincibleHealthValue();
         }
@@ -68,7 +68,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean shouldReplaceHealthMethod(Entity entity) {
-        
+
         if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.get()) {
             return true;
         }
@@ -104,7 +104,7 @@ public class DecayEntityMethods {
 
     @SuppressWarnings("unchecked")
     private static void forceAddEffectDirect(LivingEntity entity, MobEffectInstance effect, Entity source) {
-        
+
         if (entity.level().isClientSide()) return;
         java.util.Map<MobEffect, MobEffectInstance> activeEffects = null;
         try {
@@ -189,7 +189,6 @@ public class DecayEntityMethods {
     }
 
     private static void executeAbsoluteHurt(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
-        
         if (target.level().isClientSide()) return;
         if (target.isDeadOrDying()) return;
         com.maxwell.hyperdamagelib.mixin.accessor.EntityAccessor entAcc = (com.maxwell.hyperdamagelib.mixin.accessor.EntityAccessor) target;
@@ -197,11 +196,22 @@ public class DecayEntityMethods {
         if (target.isSleeping()) {
             target.stopSleeping();
         }
+
+        boolean ignoreIframe = source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.EROSION) ||
+                source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.VOID_SHRED) ||
+                source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE) ||
+                DecayDamageUtil.shouldApplyBypass(source);
+
         int invulnerableTime = entAcc.getInvulnerableTime();
         float lastHurt = livAcc.getLastHurt();
+        if (Float.isNaN(lastHurt)) {
+            lastHurt = 0.0F;
+        }
+
         float damageToApply = 0.0F;
         boolean isFreshAttack = false;
-        if (invulnerableTime > 10) {
+
+        if (invulnerableTime > 10 && !ignoreIframe) {
             if (amount > lastHurt) {
                 damageToApply = amount - lastHurt;
                 livAcc.setLastHurt(amount);
@@ -212,21 +222,49 @@ public class DecayEntityMethods {
             }
         } else {
             damageToApply = amount;
-            livAcc.setLastHurt(amount);
-            entAcc.setInvulnerableTime(20);
             isFreshAttack = true;
-            target.hurtTime = 10;
-            com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Fresh attack. Apply full: {}, set invTime to 20", damageToApply);
+            if (!ignoreIframe) {
+                livAcc.setLastHurt(amount);
+                entAcc.setInvulnerableTime(20);
+                target.hurtTime = 10;
+            }
+            com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Fresh or Iframe-bypassed attack. Apply full: {}", damageToApply);
         }
-        if (!isFreshAttack || damageToApply <= 0.0F) {
+
+        if (!isFreshAttack || damageToApply <= 0.0F || Float.isNaN(damageToApply)) {
             return;
         }
+
         try {
             com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.set(true);
             float currentHealth = target.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
+            if (Float.isNaN(currentHealth)) {
+                currentHealth = 0.0F;
+            } else if (Float.isInfinite(currentHealth)) {
+                currentHealth = 1000000.0F;
+            }
+
+            float maxHealthAttr = (float) target.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+            if (Float.isNaN(maxHealthAttr) || Float.isInfinite(maxHealthAttr) || maxHealthAttr > 1000000.0F) {
+                maxHealthAttr = 1000000.0F;
+            }
+
+
+            if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE) && maxHealthAttr > 200.0F) {
+                float percentDamage = maxHealthAttr * 0.05F; 
+                if (percentDamage > damageToApply) {
+                    damageToApply = percentDamage;
+                    com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Penetrate scaled damage (5% of max HP): {}", damageToApply);
+                }
+            }
+
             float nextHealth = Math.max(0.0F, currentHealth - damageToApply);
-            com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Real Server HP reduction: {} -> {}", currentHealth, nextHealth);
+            if (Float.isNaN(nextHealth)) {
+                nextHealth = 0.0F;
+            }
+
             if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE)) {
+
             } else if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.EROSION)) {
                 if (target instanceof IDecayEntity decayTarget) {
                     decayTarget.addDecayAmount(damageToApply);
@@ -263,6 +301,7 @@ public class DecayEntityMethods {
             target.setHealth(nextHealth);
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
+
             Entity attacker = source.getEntity();
             if (attacker instanceof LivingEntity livingAttacker) {
                 target.setLastHurtByMob(livingAttacker);
@@ -303,7 +342,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceActuallyHurt(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
-        
+
         if (target instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }
@@ -311,16 +350,26 @@ public class DecayEntityMethods {
     }
 
     public static float replaceGetHealth(LivingEntity livingEntity) {
-        
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
                 return decay.getInvincibleHealthValue();
             }
             float rawHealth = livingEntity.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+            if (Float.isNaN(rawHealth)) {
+                rawHealth = 0.0F;
+            }
             float originalMax = (float) livingEntity.getAttributeValue(
                     net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
             );
+            if (Float.isNaN(originalMax)) {
+                originalMax = 20.0F;
+            } else if (Float.isInfinite(originalMax)) {
+                originalMax = 1000000.0F;
+            }
             float cappedMax = Math.max(0.0F, originalMax - decay.getDecayAmount());
+            if (Float.isNaN(cappedMax)) {
+                cappedMax = 0.0F;
+            }
             return Math.max(-Float.MAX_VALUE, Math.min(rawHealth, cappedMax));
         }
         return (float) livingEntity.getAttributeValue(
@@ -329,56 +378,112 @@ public class DecayEntityMethods {
     }
 
     public static float getHealth(float health, LivingEntity livingEntity) {
+        if (Float.isNaN(health)) {
+            return 0.0F;
+        }
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
                 return decay.getInvincibleHealthValue();
             }
             float decayAmount = decay.getDecayAmount();
+            if (Float.isNaN(decayAmount)) {
+                decayAmount = 0.0F;
+            }
+            float maxHealth = livingEntity.getMaxHealth();
+            if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth)) {
+                maxHealth = 1000000.0F;
+            }
             if (decayAmount > 0.0F) {
-                float cappedHealth = livingEntity.getMaxHealth() - decayAmount;
+                float cappedHealth = maxHealth - decayAmount;
+                if (Float.isNaN(cappedHealth) || cappedHealth < 0.0F) {
+                    cappedHealth = 0.0F;
+                }
                 return Math.min(health, cappedHealth);
             }
         }
         return health;
     }
 
+
     public static boolean replaceIsDeadOrDying(Entity entity) {
-        
         if (entity instanceof LivingEntity living) {
+
             float rawHealth = living.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
-            if (rawHealth <= 0.0F) {
+            if (Float.isNaN(rawHealth) || rawHealth <= 0.0F) {
                 return true;
             }
             if (living instanceof IDecayEntity decay) {
                 if (decay.isSuperInvincible()) return false;
-                return decay.getDecayAmount() >= living.getMaxHealth();
+
+                float maxHealth = (float) living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+                if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
+                    maxHealth = 1000000.0F;
+                }
+
+                float decayAmount = decay.getDecayAmount();
+                if (Float.isNaN(decayAmount)) {
+                    decayAmount = 0.0F;
+                }
+                return decayAmount >= maxHealth;
             }
         }
         return false;
     }
 
     public static boolean isDeadOrDying(boolean deadOrDying, LivingEntity livingEntity) {
+
+        float health = livingEntity.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
+        if (Float.isNaN(health) || health <= 0.0F) {
+            return true;
+        }
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) return false;
-            if (decay.getDecayAmount() >= livingEntity.getMaxHealth()) {
+
+            float maxHealth = (float) livingEntity.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+            if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
+                maxHealth = 1000000.0F;
+            }
+
+            float decayAmount = decay.getDecayAmount();
+            if (Float.isNaN(decayAmount)) {
+                decayAmount = 0.0F;
+            }
+            if (decayAmount >= maxHealth) {
                 return true;
             }
         }
         return deadOrDying;
     }
 
-    public static boolean replaceIsAlive(Entity entity) {
-        return !replaceIsDeadOrDying(entity);
-    }
-
     public static boolean isAlive(boolean alive, Entity entity) {
-        if (entity instanceof LivingEntity living && entity instanceof IDecayEntity decay) {
-            if (decay.isSuperInvincible()) return true;
-            if (decay.getDecayAmount() >= living.getMaxHealth()) {
+        if (entity instanceof LivingEntity living) {
+
+            float health = living.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
+            if (Float.isNaN(health) || health <= 0.0F) {
                 return false;
+            }
+            if (entity instanceof IDecayEntity decay) {
+                if (decay.isSuperInvincible()) return true;
+
+                float maxHealth = (float) living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+                if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
+                    maxHealth = 1000000.0F;
+                }
+
+                float decayAmount = decay.getDecayAmount();
+                if (Float.isNaN(decayAmount)) {
+                    decayAmount = 0.0F;
+                }
+                if (decayAmount >= maxHealth) {
+                    return false;
+                }
             }
         }
         return alive;
+    }
+
+    public static boolean replaceIsAlive(Entity entity) {
+        return !replaceIsDeadOrDying(entity);
     }
 
     public static Entity.RemovalReason getRemovalReason(Entity.RemovalReason removalReason, Entity entity) {
@@ -408,7 +513,7 @@ public class DecayEntityMethods {
     }
 
     public static void tickOverride(java.util.function.Consumer<Entity> consumer, Entity entity) {
-        
+
         consumer.accept(entity);
     }
 
@@ -433,7 +538,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean shouldPreventServerPlayerDie(Entity entity) {
-        
+
         if (entity instanceof ServerPlayer player) {
             if (player.connection == null) {
                 return true;
@@ -446,7 +551,7 @@ public class DecayEntityMethods {
     }
 
     public static float getMaxHealth(float maxHealth, LivingEntity livingEntity) {
-        
+
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
                 return maxHealth;
@@ -460,11 +565,8 @@ public class DecayEntityMethods {
     }
 
     public static float replaceGetMaxHealth(LivingEntity livingEntity) {
-        
-
-
         float rawHealth = livingEntity.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
-        if (rawHealth <= 0.0F) {
+        if (Float.isNaN(rawHealth) || rawHealth <= 0.0F) {
             return 0.0F;
         }
 
@@ -472,11 +574,21 @@ public class DecayEntityMethods {
             float originalMax = (float) livingEntity.getAttributeValue(
                     net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
             );
+
+            if (Float.isNaN(originalMax)) {
+                originalMax = 20.0F;
+            } else if (Float.isInfinite(originalMax)) {
+                originalMax = 1000000.0F;
+            }
+
             if (decay.isSuperInvincible()) {
                 return originalMax;
             }
             float cappedHealth = originalMax - decay.getDecayAmount();
-            return Math.max(1.0F, cappedHealth);
+            if (Float.isNaN(cappedHealth) || cappedHealth < 1.0F) {
+                return 1.0F;
+            }
+            return cappedHealth;
         }
         return (float) livingEntity.getAttributeValue(
                 net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
@@ -490,7 +602,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceDie(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
-        
+
         if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.get()) {
             float rawHealth = self.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
             if (rawHealth <= 0.0F) {
@@ -508,7 +620,7 @@ public class DecayEntityMethods {
     }
 
     private static void executeForceDieSequence(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
-        
+
         if (!self.level().isClientSide()) {
             ((LivingEntityAccessor) self).setDeadFlag(true);
             self.deathTime = 1;
@@ -524,7 +636,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceKill(Entity entity) {
-        
+
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }
@@ -532,7 +644,7 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceDropLoot(LivingEntity entity) {
-        
+
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }

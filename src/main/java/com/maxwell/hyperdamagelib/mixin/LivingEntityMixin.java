@@ -79,10 +79,32 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         float originalMax = (float) self.getAttributeValue(
                 net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
         );
+
+        if (Float.isNaN(originalMax)) {
+            originalMax = 20.0F;
+        } else if (Float.isInfinite(originalMax)) {
+            originalMax = 1000000.0F; 
+        }
+
+        if (Float.isNaN(amount)) {
+            amount = 0.0F;
+        } else if (Float.isInfinite(amount)) {
+            amount = originalMax;
+        }
+
         this.decayAmount = Math.max(0.0f, Math.min(amount, originalMax));
-        float cappedMax = Math.max(0.0F, originalMax - getDecayAmount());
+        float cappedMax = originalMax - getDecayAmount();
+
+        if (Float.isNaN(cappedMax) || cappedMax < 0.0F) {
+            cappedMax = 0.0F;
+        }
+
         float realHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-        if (realHealth > cappedMax) {
+        if (Float.isNaN(realHealth)) {
+            realHealth = 0.0F;
+        }
+
+        if (realHealth > cappedMax || Float.isInfinite(realHealth)) {
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 self.setHealth(cappedMax);
@@ -190,6 +212,12 @@ public abstract class LivingEntityMixin implements IDecayEntity {
 
     @ModifyVariable(method = "setHealth", at = @At("HEAD"), argsOnly = true)
     private float decay$modifySetHealthArg(float value) {
+        if (Float.isNaN(value)) {
+            value = 0.0F;
+        }
+        if (value < 0.0F) {
+            value = 0.0F;
+        }
         if (decay$isLoginIncomplete()) {
             return value;
         }
@@ -198,7 +226,12 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             return decay$getTargetInvincibleHealth();
         }
         float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-        float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
+        if (Float.isNaN(currentHealth)) currentHealth = 0.0F;
+
+        float maxHp = self.getMaxHealth();
+        if (Float.isNaN(maxHp) || Float.isInfinite(maxHp)) maxHp = 1000000.0F;
+
+        float cappedMax = Math.max(0.0f, maxHp - this.decayAmount);
         if (this.decayHoldTicks > 0 || this.decayAmount > 0.0f) {
             if (value > currentHealth) {
                 return Math.min(currentHealth, cappedMax);

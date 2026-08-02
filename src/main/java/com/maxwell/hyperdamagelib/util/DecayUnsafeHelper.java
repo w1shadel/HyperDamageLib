@@ -20,15 +20,30 @@ public class DecayUnsafeHelper {
     };
 
     public static void detectAndCrashOnReflection() {
-        for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
-            String className = element.getClassName();
+        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+        int helperIndex = -1;
+
+        for (int i = 0; i < stackTrace.length; i++) {
+            if (stackTrace[i].getClassName().equals("com.maxwell.hyperdamagelib.util.DecayUnsafeHelper") &&
+                    stackTrace[i].getMethodName().equals("detectAndCrashOnReflection")) {
+                helperIndex = i;
+                break;
+            }
+        }
+
+
+        if (helperIndex != -1 && helperIndex + 2 < stackTrace.length) {
+            StackTraceElement caller = stackTrace[helperIndex + 2];
+            String className = caller.getClassName();
 
             if (className.equals("java.lang.reflect.Method") ||
                     className.startsWith("sun.reflect.") ||
-                    className.startsWith("jdk.internal.reflect.")) {
+                    className.startsWith("jdk.internal.reflect.") ||
+                    className.startsWith("java.lang.invoke.")) { 
 
                 String randomDescription = FUNNY_DESCRIPTIONS[RANDOM.nextInt(FUNNY_DESCRIPTIONS.length)];
-                String randomThrowableMsg = FUNNY_THROWABLES[RANDOM.nextInt(FUNNY_THROWABLES.length)] + " | Caller: " + element.toString();
+
+                String randomThrowableMsg = FUNNY_THROWABLES[RANDOM.nextInt(FUNNY_THROWABLES.length)] + " | Caller: " + caller.toString();
 
                 Throwable throwable = new SecurityException(randomThrowableMsg);
 
@@ -36,7 +51,7 @@ public class DecayUnsafeHelper {
 
                 net.minecraft.CrashReportCategory category = crashReport.addCategory("HDL Security Details");
                 category.setDetail("Unauthorized Caller Class", className);
-                category.setDetail("Stack Trace Element", element.toString());
+                category.setDetail("Stack Trace Element", caller.toString());
                 category.setDetail("Security Action", "Triggered native crash to protect game state.");
 
                 if (net.minecraftforge.fml.loading.FMLEnvironment.dist == net.minecraftforge.api.distmarker.Dist.CLIENT) {
