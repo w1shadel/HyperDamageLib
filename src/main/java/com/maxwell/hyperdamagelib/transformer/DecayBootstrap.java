@@ -87,8 +87,9 @@ public final class DecayBootstrap {
             if (!DecayUnsafeHelper.allowAttachSelf()) {
                 LOGGER.debug("Could not force attach-self via Unsafe; relying on -Djdk.attach.allowAttachSelf");
             }
-            File agentJar = buildAgentJar();
-            LOGGER.debug("Agent jar: {}", agentJar.getAbsolutePath());
+            File agentJar = extractAgentJar();
+            LOGGER.debug("Agent jar extracted to: {}", agentJar.getAbsolutePath());
+
             String pid = String.valueOf(ProcessHandle.current().pid());
             VirtualMachine vm = VirtualMachine.attach(pid);
             try {
@@ -126,27 +127,20 @@ public final class DecayBootstrap {
         }
     }
 
-    private static File buildAgentJar() throws IOException {
-        byte[] agentBytes = readResource(AGENT_RESOURCE);
-        byte[] bridgeBytes = readResource(BRIDGE_RESOURCE);
-        Manifest mf = new Manifest();
-        Attributes a = mf.getMainAttributes();
-        a.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-        a.putValue("Agent-Class", AGENT_CLASS);
-        a.putValue("Premain-Class", AGENT_CLASS);
-        a.putValue("Can-Retransform-Classes", "true");
-        a.putValue("Can-Redefine-Classes", "true");
-        File jar = File.createTempFile("decay/decay-agent-", ".jar");
-        jar.deleteOnExit();
-        try (JarOutputStream jos = new JarOutputStream(new FileOutputStream(jar), mf)) {
-            jos.putNextEntry(new JarEntry(AGENT_RESOURCE));
-            jos.write(agentBytes);
-            jos.closeEntry();
-            jos.putNextEntry(new JarEntry(BRIDGE_RESOURCE));
-            jos.write(bridgeBytes);
-            jos.closeEntry();
+    private static File extractAgentJar() throws IOException {
+        String resourcePath = "/META-INF/jarjar/decay-agent.jar";
+        InputStream is = DecayBootstrap.class.getResourceAsStream(resourcePath);
+        if (is == null) {
+            throw new IOException("Embedded agent JAR not found in resources: " + resourcePath);
         }
-        return jar;
+
+        File tempFile = File.createTempFile("decay-agent-", ".jar");
+        tempFile.deleteOnExit();
+
+        try (FileOutputStream os = new FileOutputStream(tempFile)) {
+            is.transferTo(os);
+        }
+        return tempFile;
     }
 
     private static byte[] readResource(String resource) throws IOException {
