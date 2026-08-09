@@ -170,7 +170,7 @@ public final class DecayBootstrap {
             if (!classesToRetransform.isEmpty()) {
                 Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
                 instrumentation.retransformClasses(classArray);
-                // ログ出力の参照を補正
+
                 com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
             }
         } catch (Exception e) {
