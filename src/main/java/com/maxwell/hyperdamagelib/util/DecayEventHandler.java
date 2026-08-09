@@ -19,17 +19,6 @@ import net.minecraftforge.network.PacketDistributor;
 
 @Mod.EventBusSubscriber(modid = HDL.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayEventHandler {
-    private static long EVENT_CANCELED_OFFSET = -1;
-    private static java.lang.reflect.Field EVENT_CANCELED_FIELD = null;
-
-    static {
-        try {
-            EVENT_CANCELED_FIELD = net.minecraftforge.eventbus.api.Event.class.getDeclaredField("isCanceled");
-            DecayUnsafeHelper.forceSetAccessible(EVENT_CANCELED_FIELD);
-            EVENT_CANCELED_OFFSET = DecayUnsafeHelper.getFieldOffset(EVENT_CANCELED_FIELD);
-        } catch (Throwable ignored) {
-        }
-    }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingAttack(LivingAttackEvent event) {
@@ -103,23 +92,6 @@ public class DecayEventHandler {
                     entity.teleportTo(sharedSpawn.getX() + 0.5D, sharedSpawn.getY() + 1.0D, sharedSpawn.getZ() + 0.5D);
                 }
                 entity.fallDistance = 0.0F;
-            }
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
-    public static void enforceDecayDeath(net.minecraftforge.event.entity.living.LivingDeathEvent event) {
-        if (event.getEntity() instanceof IDecayEntity decayEntity) {
-            if (decayEntity.getDecayAmount() >= event.getEntity().getMaxHealth()) {
-                if (event.isCanceled()) {
-                    try {
-                        event.setCanceled(false);
-                    } catch (Throwable ignored) {
-                    }
-                    if (event.isCanceled() && EVENT_CANCELED_OFFSET != -1) {
-                        DecayUnsafeHelper.putBoolean(event, EVENT_CANCELED_OFFSET, false);
-                    }
-                }
             }
         }
     }

@@ -31,7 +31,7 @@ public final class DecayDamageUtil {
     }
 
     public static void forceSetHealthVanillaRawDirect(SynchedEntityData entityData, EntityDataAccessor<?> accessor, Object value) {
-        DecayUnsafeHelper.detectAndCrashOnReflection();
+        DecaySecurity.checkReflectionAccess();
         try {
             java.lang.reflect.Field itemsField = null;
             try {
@@ -141,7 +141,7 @@ public final class DecayDamageUtil {
     }
 
     public static DamageSource getErosionSource(Level level, @Nullable Entity attacker, @Nullable String customDeathMessage) {
-        DecayUnsafeHelper.detectAndCrashOnReflection();
+        DecaySecurity.checkReflectionAccess();
         Holder<DamageType> holder = level.registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE)
                 .getHolderOrThrow(ModDamageTypes.EROSION);
@@ -162,7 +162,7 @@ public final class DecayDamageUtil {
     }
 
     public static DamageSource getVoidShredSource(Level level, @Nullable Entity attacker, @Nullable String customDeathMessage) {
-        DecayUnsafeHelper.detectAndCrashOnReflection();
+        DecaySecurity.checkReflectionAccess();
         Holder<DamageType> holder = level.registryAccess()
                 .registryOrThrow(Registries.DAMAGE_TYPE)
                 .getHolderOrThrow(ModDamageTypes.VOID_SHRED);
@@ -183,7 +183,7 @@ public final class DecayDamageUtil {
     }
 
     public static DamageSource getPenetrateSource(Level level, @Nullable Entity attacker, @Nullable String customDeathMessage) {
-        DecayUnsafeHelper.detectAndCrashOnReflection();
+        DecaySecurity.checkReflectionAccess();
         
         Holder<DamageType> holder;
         try {

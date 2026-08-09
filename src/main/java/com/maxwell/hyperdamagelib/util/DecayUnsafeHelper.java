@@ -12,36 +12,6 @@ public class DecayUnsafeHelper {
     public static final boolean AVAILABLE;
     public static final long OVERRIDE_OFFSET = 12;
 
-    public static void detectAndCrashOnReflection() {
-        if (isInvokedViaReflection()) {
-            throw new SecurityException("Access denied: Direct compiled calls are required. Reflection is prohibited.");
-        }
-    }
-
-    private static boolean isInvokedViaReflection() {
-
-        StackWalker walker = StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
-
-        return walker.walk(frames ->
-                frames.map(StackWalker.StackFrame::getDeclaringClass)
-                        .map(Class::getName)
-
-                        .anyMatch(DecayUnsafeHelper::isReflectionClass)
-        );
-    }
-
-    /**
-     * 指定されたクラス名がリフレクション用の内部クラスかどうか判定します。
-     */
-    private static boolean isReflectionClass(String className) {
-        return className.startsWith("java.lang.reflect.")      
-                || className.startsWith("java.lang.invoke.")       
-                || className.startsWith("jdk.internal.reflect.")   
-                || className.startsWith("sun.reflect.");           
-    }
-
-
-
     static {
         Unsafe unsafe = null;
         boolean available = false;
@@ -74,7 +44,7 @@ public class DecayUnsafeHelper {
     }
 
     public static boolean forceSetAccessible(AccessibleObject accessibleObject) {
-        detectAndCrashOnReflection();
+        DecaySecurity.checkReflectionAccess();
         if (accessibleObject.trySetAccessible()) {
             return true;
         }
@@ -85,35 +55,6 @@ public class DecayUnsafeHelper {
             UNSAFE.putBoolean(accessibleObject, OVERRIDE_OFFSET, true);
             return true;
         } catch (Throwable throwable) {
-            return false;
-        }
-    }
-
-    public static long getFieldOffset(Field field) {
-        if (!AVAILABLE) return -1;
-        try {
-            return UNSAFE.objectFieldOffset(field);
-        } catch (Throwable e) {
-            return -1;
-        }
-    }
-
-    public static boolean putBoolean(Object object, long offset, boolean value) {
-        if (!AVAILABLE || offset == -1) return false;
-        try {
-            UNSAFE.putBoolean(object, offset, value);
-            return true;
-        } catch (Throwable e) {
-            return false;
-        }
-    }
-
-    public static boolean putObject(Object object, long offset, Object value) {
-        if (!AVAILABLE || offset == -1) return false;
-        try {
-            UNSAFE.putObject(object, offset, value);
-            return true;
-        } catch (Throwable e) {
             return false;
         }
     }
