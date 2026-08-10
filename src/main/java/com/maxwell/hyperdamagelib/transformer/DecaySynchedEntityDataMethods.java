@@ -51,8 +51,18 @@ public class DecaySynchedEntityDataMethods {
             if (entity == null || entity.level().isClientSide()) {
                 return value;
             }
+            if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+                if (!dummy.isRemoveBypass()) {
+                    if (accessor.equals(LivingEntityAccessor.getDataHealthId())) {
+                        return Float.valueOf(dummy.getMaxHealth());
+                    }
+                }
+            }
             if (entity instanceof IDecayEntity decayEntity && entity instanceof LivingEntity living) {
                 if (decayEntity.isSuperInvincible()) {
+                    if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.FORCE_DAMAGE.get()) {
+                        return value;
+                    }
                     if (accessor.equals(LivingEntityAccessor.getDataHealthId())) {
                         if (value instanceof Float) {
                             return Float.valueOf(decayEntity.getInvincibleHealthValue());

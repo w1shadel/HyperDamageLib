@@ -14,6 +14,11 @@ public abstract class EntityMixin {
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             ci.cancel();
         }
+        if ((Object) this instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                ci.cancel();
+            }
+        }
     }
 
     @Inject(method = "setRemoved", at = @At("HEAD"), cancellable = true)
@@ -23,6 +28,11 @@ public abstract class EntityMixin {
                 if (reason == Entity.RemovalReason.KILLED || reason == Entity.RemovalReason.DISCARDED) {
                     ci.cancel();
                 }
+            }
+        }
+        if ((Object) this instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                ci.cancel();
             }
         }
     }

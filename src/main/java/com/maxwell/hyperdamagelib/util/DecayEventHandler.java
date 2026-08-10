@@ -3,8 +3,18 @@ package com.maxwell.hyperdamagelib.util;
 import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
+import com.mojang.brigadier.arguments.BoolArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -16,10 +26,13 @@ import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
+import net.minecraftforge.registries.ForgeRegistries;
+
+import javax.annotation.Nullable;
+import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = HDL.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayEventHandler {
-
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingAttack(LivingAttackEvent event) {
         net.minecraft.world.damagesource.DamageSource source = event.getSource();
@@ -239,7 +252,7 @@ public class DecayEventHandler {
         if (event.getTarget() instanceof IDecayEntity decay && event.getEntity() instanceof ServerPlayer serverPlayer) {
             ModMessages.INSTANCE.send(
                     PacketDistributor.PLAYER.with(() -> serverPlayer),
-                    new ClientboundDecaySyncPacket(event.getTarget().getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue())
+                    new ClientboundDecaySyncPacket(event.getTarget().getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue(), decay.isHealBlocked())
             );
         }
     }
@@ -249,7 +262,7 @@ public class DecayEventHandler {
         if (event.getEntity() instanceof ServerPlayer serverPlayer && serverPlayer instanceof IDecayEntity decay) {
             ModMessages.INSTANCE.send(
                     PacketDistributor.PLAYER.with(() -> serverPlayer),
-                    new ClientboundDecaySyncPacket(serverPlayer.getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue())
+                    new ClientboundDecaySyncPacket(serverPlayer.getId(), decay.getDecayAmount(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue(), decay.isHealBlocked())
             );
         }
     }
@@ -257,8 +270,9 @@ public class DecayEventHandler {
     @SubscribeEvent
     public static void onRegisterCommands(net.minecraftforge.event.RegisterCommandsEvent event) {
         event.getDispatcher().register(
-                net.minecraft.commands.Commands.literal("hdl")
-                        .then(net.minecraft.commands.Commands.literal("inspect")
+                Commands.literal("hdl")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.literal("inspect")
                                 .executes(context -> {
                                     net.minecraft.commands.CommandSourceStack source = context.getSource();
                                     net.minecraft.server.level.ServerPlayer player = source.getPlayer();
@@ -268,45 +282,241 @@ public class DecayEventHandler {
                                     return 1;
                                 })
                         )
-
-                        .then(net.minecraft.commands.Commands.literal("test_direct")
-                                .executes(context -> {
-                                    net.minecraft.server.level.ServerPlayer player = context.getSource().getPlayer();
-                                    if (player != null) {
-
-                                        com.maxwell.hyperdamagelib.util.DecayDamageUtil.getErosionSource(player.level(), player);
-                                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§a[HDL Test] 直接呼び出しの通過に成功しました（クラッシュしなければ正常です）。"));
-                                    }
-                                    return 1;
-                                })
+                        .then(Commands.literal("forceDamage")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .then(Commands.argument("amount", FloatArgumentType.floatArg(0.0F))
+                                                .executes(context -> {
+                                                    return forceDamage(context.getSource(), EntityArgument.getEntities(context, "targets"), FloatArgumentType.getFloat(context, "amount"), null);
+                                                })
+                                                .then(Commands.argument("attacker", EntityArgument.entity())
+                                                        .executes(context -> {
+                                                            return forceDamage(context.getSource(), EntityArgument.getEntities(context, "targets"), FloatArgumentType.getFloat(context, "amount"), EntityArgument.getEntity(context, "attacker"));
+                                                        })
+                                                )
+                                        )
+                                )
                         )
-
-                        .then(net.minecraft.commands.Commands.literal("test_reflection")
-                                .executes(context -> {
-                                    net.minecraft.server.level.ServerPlayer player = context.getSource().getPlayer();
-                                    if (player != null) {
-                                        player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§c[HDL Test] リフレクションでの呼び出しを試行します。クラッシュすれば成功です..."));
-
-                                        try {
-                                            java.lang.reflect.Method method = com.maxwell.hyperdamagelib.util.DecayDamageUtil.class.getMethod(
-                                                    "getErosionSource",
-                                                    net.minecraft.world.level.Level.class,
-                                                    net.minecraft.world.entity.Entity.class
-                                            );
-
-                                            method.invoke(null, player.level(), player);
-                                        } catch (Exception e) {
-
-
-                                            player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§cキャッチされました: " + e.getMessage()));
-                                            e.printStackTrace();
-                                        }
-                                    }
-                                    return 1;
-                                })
+                        .then(Commands.literal("forceHeal")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .executes(context -> {
+                                            return forceHeal(context.getSource(), EntityArgument.getEntities(context, "targets"), null);
+                                        })
+                                        .then(Commands.argument("amount", FloatArgumentType.floatArg(0.0F))
+                                                .executes(context -> {
+                                                    return forceHeal(context.getSource(), EntityArgument.getEntities(context, "targets"), FloatArgumentType.getFloat(context, "amount"));
+                                                })
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("setHyperInvincible")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                                .executes(context -> {
+                                                    return setHyperInvincible(context.getSource(), EntityArgument.getEntities(context, "targets"), BoolArgumentType.getBool(context, "value"));
+                                                })
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("setDecayAmount")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .then(Commands.argument("amount", FloatArgumentType.floatArg(0.0F))
+                                                .executes(context -> {
+                                                    return setDecayAmount(context.getSource(), EntityArgument.getEntities(context, "targets"), FloatArgumentType.getFloat(context, "amount"));
+                                                })
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("setHealBlock")
+                                .then(Commands.argument("targets", EntityArgument.entities())
+                                        .then(Commands.argument("value", BoolArgumentType.bool())
+                                                .executes(context -> {
+                                                    return setHealBlock(context.getSource(), EntityArgument.getEntities(context, "targets"), BoolArgumentType.getBool(context, "value"));
+                                                })
+                                        )
+                                )
+                        )
+                        .then(Commands.literal("forceEffect")
+                                .then(Commands.literal("give")
+                                        .then(Commands.argument("targets", EntityArgument.entities())
+                                                .then(Commands.argument("effect", ResourceLocationArgument.id())
+                                                        .suggests((ctx, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggestResource(ForgeRegistries.MOB_EFFECTS.getKeys(), builder))
+                                                        .then(Commands.argument("seconds", IntegerArgumentType.integer(0))
+                                                                .then(Commands.argument("amplifier", IntegerArgumentType.integer(0))
+                                                                        .then(Commands.argument("showParticles", BoolArgumentType.bool())
+                                                                                .executes(context -> {
+                                                                                    ResourceLocation effectId = ResourceLocationArgument.getId(context, "effect");
+                                                                                    MobEffect effect = ForgeRegistries.MOB_EFFECTS.getValue(effectId);
+                                                                                    if (effect == null) {
+                                                                                        throw new SimpleCommandExceptionType(Component.translatable("commands.hdl.force_effect.invalid", effectId)).create();
+                                                                                    }
+                                                                                    return forceEffectGive(context.getSource(), EntityArgument.getEntities(context, "targets"), effect, IntegerArgumentType.getInteger(context, "seconds"), IntegerArgumentType.getInteger(context, "amplifier"), BoolArgumentType.getBool(context, "showParticles"));
+                                                                                })
+                                                                        )
+                                                                )
+                                                        )
+                                                )
+                                        )
+                                )
+                                .then(Commands.literal("clear")
+                                        .then(Commands.argument("targets", EntityArgument.entities())
+                                                .then(Commands.argument("effect", ResourceLocationArgument.id())
+                                                        .suggests((ctx, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggestResource(ForgeRegistries.MOB_EFFECTS.getKeys(), builder))
+                                                        .executes(context -> {
+                                                            ResourceLocation effectId = ResourceLocationArgument.getId(context, "effect");
+                                                            MobEffect effect = ForgeRegistries.MOB_EFFECTS.getValue(effectId);
+                                                            if (effect == null) {
+                                                                throw new SimpleCommandExceptionType(Component.translatable("commands.hdl.force_effect.invalid", effectId)).create();
+                                                            }
+                                                            return forceEffectClear(context.getSource(), EntityArgument.getEntities(context, "targets"), effect);
+                                                        })
+                                                )
+                                        )
+                                )
                         )
         );
     }
+
+    private static int forceDamage(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, float amount, @Nullable net.minecraft.world.entity.Entity attacker) {
+        int count = 0;
+        try {
+            DecayDamageUtil.FORCE_DAMAGE.set(true);
+            for (net.minecraft.world.entity.Entity entity : targets) {
+                if (entity instanceof LivingEntity living) {
+                    net.minecraft.world.damagesource.DamageSource damageSource = DecayDamageUtil.getErosionSource(living.level(), attacker);
+                    living.hurt(damageSource, amount);
+                    count++;
+                }
+            }
+        } finally {
+            DecayDamageUtil.FORCE_DAMAGE.remove();
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> Component.translatable("commands.hdl.force_damage.success", finalCount, amount), true);
+        return count;
+    }
+
+    private static int forceHeal(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, @Nullable Float amount) {
+        int count = 0;
+        for (net.minecraft.world.entity.Entity entity : targets) {
+            if (entity instanceof LivingEntity living) {
+                executeForceHeal(living, amount);
+                count++;
+            }
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> {
+            Component amountComp = (amount == null)
+                    ? Component.translatable("commands.hdl.common.full")
+                    : Component.literal(String.valueOf(amount));
+            return Component.translatable("commands.hdl.force_heal.success", finalCount, amountComp);
+        }, true);
+        return count;
+    }
+
+    private static void executeForceHeal(LivingEntity target, @Nullable Float amount) {
+        try {
+            DecayDamageUtil.BYPASS_DECAY.set(true);
+            if (target instanceof IDecayEntity decay) {
+                decay.setDecayAmount(0.0F);
+                decay.setDecayHoldTicks(0);
+            }
+            float originalMax = (float) target.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+            float targetHealth;
+            if (amount == null) {
+                targetHealth = originalMax;
+            } else {
+                targetHealth = Math.min(originalMax, target.getHealth() + amount);
+            }
+            target.setHealth(targetHealth);
+            target.deathTime = 0;
+            target.dead = false;
+        } finally {
+            DecayDamageUtil.BYPASS_DECAY.remove();
+        }
+    }
+
+    private static int setHyperInvincible(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, boolean value) {
+        int count = 0;
+        for (net.minecraft.world.entity.Entity entity : targets) {
+            if (entity instanceof IDecayEntity decay) {
+                decay.setSuperInvincible(value);
+                count++;
+            }
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> {
+            Component stateComp = value
+                    ? Component.translatable("commands.hdl.common.on")
+                    : Component.translatable("commands.hdl.common.off");
+            return Component.translatable("commands.hdl.set_hyper_invincible.success", finalCount, stateComp);
+        }, true);
+        return count;
+    }
+
+    private static int setDecayAmount(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, float amount) {
+        int count = 0;
+        for (net.minecraft.world.entity.Entity entity : targets) {
+            if (entity instanceof IDecayEntity decay) {
+                decay.setDecayAmount(amount);
+                count++;
+            }
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> Component.translatable("commands.hdl.set_decay_amount.success", finalCount, amount), true);
+        return count;
+    }
+
+    private static int setHealBlock(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, boolean value) {
+        int count = 0;
+        for (net.minecraft.world.entity.Entity entity : targets) {
+            if (entity instanceof IDecayEntity decay) {
+                decay.setHealBlocked(value);
+                count++;
+            }
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> {
+            Component stateComp = value
+                    ? Component.translatable("commands.hdl.common.on")
+                    : Component.translatable("commands.hdl.common.off");
+            return Component.translatable("commands.hdl.set_heal_block.success", finalCount, stateComp);
+        }, true);
+        return count;
+    }
+
+    private static int forceEffectGive(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, MobEffect effect, int seconds, int amplifier, boolean showParticles) {
+        int count = 0;
+        int durationTicks = seconds * 20;
+        MobEffectInstance instance = new MobEffectInstance(effect, durationTicks, amplifier, false, showParticles);
+        for (net.minecraft.world.entity.Entity entity : targets) {
+            if (entity instanceof LivingEntity living) {
+                DecayDamageUtil.forceAddEffect(living, instance, null);
+                count++;
+            }
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> Component.translatable("commands.hdl.force_effect.give.success", finalCount, effect.getDisplayName()), true);
+        return count;
+    }
+
+    private static int forceEffectClear(net.minecraft.commands.CommandSourceStack source, java.util.Collection<? extends net.minecraft.world.entity.Entity> targets, MobEffect effect) {
+        int count = 0;
+        try {
+            com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_EFFECT.set(true);
+            for (net.minecraft.world.entity.Entity entity : targets) {
+                if (entity instanceof LivingEntity living) {
+                    living.removeEffect(effect);
+                    count++;
+                }
+            }
+        } finally {
+            com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_EFFECT.remove();
+        }
+        final int finalCount = count;
+        source.sendSuccess(() -> Component.translatable("commands.hdl.force_effect.clear.success", finalCount, effect.getDisplayName()), true);
+        return count;
+    }
+
     private static void performInspection(net.minecraft.server.level.ServerPlayer player) {
         if (player == null) return;
         com.maxwell.hyperdamagelib.util.IDecayEntity decay = (com.maxwell.hyperdamagelib.util.IDecayEntity) player;
@@ -344,5 +554,71 @@ public class DecayEventHandler {
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§fisAddedToWorld: " + isAddedToWorld));
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§f Erased: " + (hasErased ? "§cTRUE" : "§aFALSE")));
         player.sendSystemMessage(net.minecraft.network.chat.Component.literal("§d================================"));
+    }
+
+    @SubscribeEvent
+    public static void onServerTickDummyWatchdog(net.minecraftforge.event.TickEvent.ServerTickEvent event) {
+        if (event.phase != net.minecraftforge.event.TickEvent.Phase.END) return;
+        net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server == null) return;
+        for (java.util.Map.Entry<UUID, com.maxwell.hyperdamagelib.util.DummyWatchdog.DummyData> entry : com.maxwell.hyperdamagelib.util.DummyWatchdog.ACTIVE_DUMMIES.entrySet()) {
+            UUID uuid = entry.getKey();
+            com.maxwell.hyperdamagelib.util.DummyWatchdog.DummyData data = entry.getValue();
+            net.minecraft.server.level.ServerLevel world = server.getLevel(data.dimension);
+            if (world == null) continue;
+            net.minecraft.world.entity.Entity entity = world.getEntity(uuid);
+            boolean needsReconstruction = false;
+            if (entity == null) {
+                needsReconstruction = true;
+            } else {
+                if (entity.isRemoved()) {
+                    needsReconstruction = true;
+                } else if (entity instanceof net.minecraft.world.entity.LivingEntity living) {
+                    boolean isDead = ((com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor) living).isDeadFlag();
+                    if (living.getHealth() < living.getMaxHealth() - 100.0F ||
+                            living.getPose() == net.minecraft.world.entity.Pose.DYING ||
+                            isDead) {
+                        needsReconstruction = true;
+                    }
+                }
+            }
+            if (needsReconstruction) {
+                if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+                    dummy.setRemoveBypass(true);
+                    dummy.discard();
+                } else if (entity != null) {
+                    entity.removalReason = net.minecraft.world.entity.Entity.RemovalReason.DISCARDED;
+                }
+                com.maxwell.hyperdamagelib.util.DecayForceKillHelper.removeFromMemory(entity != null ? entity : world.getEntity(uuid));
+                com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity newDummy = com.maxwell.hyperdamagelib.init.ModEntities.MEASUREMENT_DUMMY.get().create(world);
+                if (newDummy != null) {
+                    newDummy.setUUID(data.uuid);
+                    newDummy.moveTo(data.x, data.y, data.z, data.yRot, data.xRot);
+                    for (net.minecraft.world.entity.EquipmentSlot slot : net.minecraft.world.entity.EquipmentSlot.values()) {
+                        if (slot.getType() == net.minecraft.world.entity.EquipmentSlot.Type.ARMOR) {
+                            newDummy.setItemSlot(slot, data.armor.get(slot.getIndex()).copy());
+                        } else {
+                            newDummy.setItemSlot(slot, data.hands.get(slot.getIndex()).copy());
+                        }
+                    }
+                    newDummy.setRemoveBypass(false);
+                    boolean success = world.addFreshEntity(newDummy);
+                    if (!success) {
+                        UUID fallbackUuid = UUID.randomUUID();
+                        newDummy.setUUID(fallbackUuid);
+                        world.addFreshEntity(newDummy);
+                        com.maxwell.hyperdamagelib.util.DummyWatchdog.ACTIVE_DUMMIES.remove(data.uuid);
+                        com.maxwell.hyperdamagelib.util.DummyWatchdog.ACTIVE_DUMMIES.put(fallbackUuid,
+                                new com.maxwell.hyperdamagelib.util.DummyWatchdog.DummyData(
+                                        fallbackUuid, data.dimension, data.x, data.y, data.z, data.yRot, data.xRot, data.armor, data.hands
+                                )
+                        );
+                        com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL Watchdog] Dummy (UUID: {}) assigned to fallback UUID: {} for forced respawn.", data.uuid, fallbackUuid);
+                    } else {
+                        com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL Watchdog] Measurement Dummy (UUID: {}) was automatically restored.", uuid);
+                    }
+                }
+            }
+        }
     }
 }

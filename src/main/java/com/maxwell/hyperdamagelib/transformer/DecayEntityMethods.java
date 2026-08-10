@@ -3,7 +3,6 @@ package com.maxwell.hyperdamagelib.transformer;
 import com.maxwell.hyperdamagelib.effect.DecayMobEffect;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
-import com.maxwell.hyperdamagelib.util.DecayUnsafeHelper;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,12 +16,22 @@ public class DecayEntityMethods {
     private static final ThreadLocal<java.util.List<MobEffectInstance>> PRESERVED_EFFECTS = ThreadLocal.withInitial(java.util.ArrayList::new);
 
     public static boolean shouldPreventEffectRemoval(MobEffect effect) {
-
+        if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_EFFECT.get()) {
+            return false;
+        }
         return effect instanceof DecayMobEffect;
     }
 
-    public static void preserveDecayEffects(LivingEntity entity) {
+    public static float handleHeal(LivingEntity entity, float amount) {
+        if (entity instanceof IDecayEntity decay) {
+            if (decay.isHealBlocked()) {
+                return 0.0F;
+            }
+        }
+        return amount;
+    }
 
+    public static void preserveDecayEffects(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
         java.util.List<MobEffectInstance> list = PRESERVED_EFFECTS.get();
         list.clear();
@@ -34,7 +43,6 @@ public class DecayEntityMethods {
     }
 
     public static void restoreDecayEffects(LivingEntity entity) {
-
         if (entity.level().isClientSide()) return;
         java.util.List<MobEffectInstance> list = PRESERVED_EFFECTS.get();
         if (!list.isEmpty()) {
@@ -46,7 +54,11 @@ public class DecayEntityMethods {
     }
 
     public static float handleSetHealth(LivingEntity entity, float health) {
-
+        if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                return dummy.getMaxHealth();
+            }
+        }
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return decay.getInvincibleHealthValue();
         }
@@ -67,26 +79,29 @@ public class DecayEntityMethods {
         return health;
     }
 
-    public static boolean shouldReplaceHealthMethod(Entity entity) {
+    public static boolean handleForceRemove(Entity entity, Entity.RemovalReason reason) {
+        if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            return !dummy.isRemoveBypass();
+        }
+        if (entity instanceof IDecayEntity decay && decay.isSuperInvincible() && !decay.isRemoveBypass()) {
+            return true;
+        }
+        return false;
+    }
 
+    public static boolean shouldReplaceHealthMethod(Entity entity) {
         if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.get()) {
             return true;
         }
-
         if (entity instanceof LivingEntity living) {
             float rawHealth = living.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
-
-
-
             float maxHealth = (float) living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
             if (rawHealth < maxHealth) {
                 return true;
             }
-
             if (living.dead || living.deathTime > 0) {
                 return true;
             }
-
             if (living instanceof IDecayEntity decay) {
                 return decay.isSuperInvincible() || decay.getDecayAmount() > 0.0F;
             }
@@ -104,7 +119,6 @@ public class DecayEntityMethods {
 
     @SuppressWarnings("unchecked")
     private static void forceAddEffectDirect(LivingEntity entity, MobEffectInstance effect, Entity source) {
-
         if (entity.level().isClientSide()) return;
         java.util.Map<MobEffect, MobEffectInstance> activeEffects = null;
         try {
@@ -175,6 +189,14 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceDamage(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
+        if (target instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            dummy.recordDamageAbsolute(source, amount);
+            return true;
+        }
+        if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.FORCE_DAMAGE.get()) {
+            executeAbsoluteHurt(target, source, amount);
+            return true;
+        }
         if (target instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }
@@ -196,21 +218,17 @@ public class DecayEntityMethods {
         if (target.isSleeping()) {
             target.stopSleeping();
         }
-
         boolean ignoreIframe = source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.EROSION) ||
                 source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.VOID_SHRED) ||
                 source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE) ||
                 DecayDamageUtil.shouldApplyBypass(source);
-
         int invulnerableTime = entAcc.getInvulnerableTime();
         float lastHurt = livAcc.getLastHurt();
         if (Float.isNaN(lastHurt)) {
             lastHurt = 0.0F;
         }
-
         float damageToApply = 0.0F;
         boolean isFreshAttack = false;
-
         if (invulnerableTime > 10 && !ignoreIframe) {
             if (amount > lastHurt) {
                 damageToApply = amount - lastHurt;
@@ -230,11 +248,9 @@ public class DecayEntityMethods {
             }
             com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Fresh or Iframe-bypassed attack. Apply full: {}", damageToApply);
         }
-
         if (!isFreshAttack || damageToApply <= 0.0F || Float.isNaN(damageToApply)) {
             return;
         }
-
         try {
             com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.set(true);
             float currentHealth = target.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
@@ -243,28 +259,22 @@ public class DecayEntityMethods {
             } else if (Float.isInfinite(currentHealth)) {
                 currentHealth = 1000000.0F;
             }
-
             float maxHealthAttr = (float) target.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
             if (Float.isNaN(maxHealthAttr) || Float.isInfinite(maxHealthAttr) || maxHealthAttr > 1000000.0F) {
                 maxHealthAttr = 1000000.0F;
             }
-
-
             if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE) && maxHealthAttr > 200.0F) {
-                float percentDamage = maxHealthAttr * 0.05F; 
+                float percentDamage = maxHealthAttr * 0.05F;
                 if (percentDamage > damageToApply) {
                     damageToApply = percentDamage;
                     com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL-DEBUG] Penetrate scaled damage (5% of max HP): {}", damageToApply);
                 }
             }
-
             float nextHealth = Math.max(0.0F, currentHealth - damageToApply);
             if (Float.isNaN(nextHealth)) {
                 nextHealth = 0.0F;
             }
-
             if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE)) {
-
             } else if (source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.EROSION)) {
                 if (target instanceof IDecayEntity decayTarget) {
                     decayTarget.addDecayAmount(damageToApply);
@@ -301,7 +311,6 @@ public class DecayEntityMethods {
             target.setHealth(nextHealth);
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
-
             Entity attacker = source.getEntity();
             if (attacker instanceof LivingEntity livingAttacker) {
                 target.setLastHurtByMob(livingAttacker);
@@ -342,7 +351,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceActuallyHurt(LivingEntity target, net.minecraft.world.damagesource.DamageSource source, float amount) {
-
         if (target instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }
@@ -404,22 +412,21 @@ public class DecayEntityMethods {
         return health;
     }
 
-
     public static boolean replaceIsDeadOrDying(Entity entity) {
+        if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            return dummy.isRemoveBypass() ? dummy.getHealth() <= 0.0F : false;
+        }
         if (entity instanceof LivingEntity living) {
-
             float rawHealth = living.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
             if (Float.isNaN(rawHealth) || rawHealth <= 0.0F) {
                 return true;
             }
             if (living instanceof IDecayEntity decay) {
                 if (decay.isSuperInvincible()) return false;
-
                 float maxHealth = (float) living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
                 if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
                     maxHealth = 1000000.0F;
                 }
-
                 float decayAmount = decay.getDecayAmount();
                 if (Float.isNaN(decayAmount)) {
                     decayAmount = 0.0F;
@@ -431,19 +438,19 @@ public class DecayEntityMethods {
     }
 
     public static boolean isDeadOrDying(boolean deadOrDying, LivingEntity livingEntity) {
-
+        if (livingEntity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            return dummy.isRemoveBypass() ? deadOrDying : false;
+        }
         float health = livingEntity.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
         if (Float.isNaN(health) || health <= 0.0F) {
             return true;
         }
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) return false;
-
             float maxHealth = (float) livingEntity.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
             if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
                 maxHealth = 1000000.0F;
             }
-
             float decayAmount = decay.getDecayAmount();
             if (Float.isNaN(decayAmount)) {
                 decayAmount = 0.0F;
@@ -456,20 +463,20 @@ public class DecayEntityMethods {
     }
 
     public static boolean isAlive(boolean alive, Entity entity) {
+        if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            return dummy.isRemoveBypass() ? alive : true;
+        }
         if (entity instanceof LivingEntity living) {
-
             float health = living.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
             if (Float.isNaN(health) || health <= 0.0F) {
                 return false;
             }
             if (entity instanceof IDecayEntity decay) {
                 if (decay.isSuperInvincible()) return true;
-
                 float maxHealth = (float) living.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
                 if (Float.isNaN(maxHealth) || Float.isInfinite(maxHealth) || maxHealth > 1000000.0F) {
                     maxHealth = 1000000.0F;
                 }
-
                 float decayAmount = decay.getDecayAmount();
                 if (Float.isNaN(decayAmount)) {
                     decayAmount = 0.0F;
@@ -513,7 +520,6 @@ public class DecayEntityMethods {
     }
 
     public static void tickOverride(java.util.function.Consumer<Entity> consumer, Entity entity) {
-
         consumer.accept(entity);
     }
 
@@ -538,7 +544,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean shouldPreventServerPlayerDie(Entity entity) {
-
         if (entity instanceof ServerPlayer player) {
             if (player.connection == null) {
                 return true;
@@ -551,7 +556,6 @@ public class DecayEntityMethods {
     }
 
     public static float getMaxHealth(float maxHealth, LivingEntity livingEntity) {
-
         if (livingEntity instanceof IDecayEntity decay) {
             if (decay.isSuperInvincible()) {
                 return maxHealth;
@@ -569,18 +573,15 @@ public class DecayEntityMethods {
         if (Float.isNaN(rawHealth) || rawHealth <= 0.0F) {
             return 0.0F;
         }
-
         if (livingEntity instanceof IDecayEntity decay) {
             float originalMax = (float) livingEntity.getAttributeValue(
                     net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
             );
-
             if (Float.isNaN(originalMax)) {
                 originalMax = 20.0F;
             } else if (Float.isInfinite(originalMax)) {
                 originalMax = 1000000.0F;
             }
-
             if (decay.isSuperInvincible()) {
                 return originalMax;
             }
@@ -594,6 +595,7 @@ public class DecayEntityMethods {
                 net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
         );
     }
+
     public static boolean shouldPreventRemovalWrite(Entity entity) {
         if (entity instanceof IDecayEntity decay) {
             return decay.isSuperInvincible();
@@ -602,7 +604,11 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceDie(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
-
+        if (self instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                return true;
+            }
+        }
         if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.BYPASS_DECAY.get()) {
             float rawHealth = self.getEntityData().get(com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor.getDataHealthId());
             if (rawHealth <= 0.0F) {
@@ -620,7 +626,6 @@ public class DecayEntityMethods {
     }
 
     private static void executeForceDieSequence(LivingEntity self, net.minecraft.world.damagesource.DamageSource source) {
-
         if (!self.level().isClientSide()) {
             ((LivingEntityAccessor) self).setDeadFlag(true);
             self.deathTime = 1;
@@ -636,7 +641,9 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceKill(Entity entity) {
-
+        if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            return !dummy.isRemoveBypass();
+        }
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }
@@ -644,7 +651,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean handleForceDropLoot(LivingEntity entity) {
-
         if (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             return true;
         }

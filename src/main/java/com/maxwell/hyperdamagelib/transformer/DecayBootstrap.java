@@ -19,10 +19,6 @@ import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
-import java.util.jar.Attributes;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
 
 public final class DecayBootstrap {
     private static final Logger LOGGER = LoggerFactory.getLogger("DecayBootstrap");
@@ -30,8 +26,8 @@ public final class DecayBootstrap {
     private static final String AGENT_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayAgent.class";
     private static final String BRIDGE_CLASS = "com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge";
     private static final String BRIDGE_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayBytecodeBridge.class";
-    static volatile Instrumentation instrumentation = null;
     public static volatile boolean LAUNCH_PLUGIN_AVAILABLE = false;
+    static volatile Instrumentation instrumentation = null;
     private static volatile boolean STARTED = false;
 
     private DecayBootstrap() {
@@ -89,7 +85,6 @@ public final class DecayBootstrap {
             }
             File agentJar = extractAgentJar();
             LOGGER.debug("Agent jar extracted to: {}", agentJar.getAbsolutePath());
-
             String pid = String.valueOf(ProcessHandle.current().pid());
             VirtualMachine vm = VirtualMachine.attach(pid);
             try {
@@ -133,10 +128,8 @@ public final class DecayBootstrap {
         if (is == null) {
             throw new IOException("Embedded agent JAR not found in resources: " + resourcePath);
         }
-
         File tempFile = File.createTempFile("decay-agent-", ".jar");
         tempFile.deleteOnExit();
-
         try (FileOutputStream os = new FileOutputStream(tempFile)) {
             is.transferTo(os);
         }
@@ -170,7 +163,6 @@ public final class DecayBootstrap {
             if (!classesToRetransform.isEmpty()) {
                 Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
                 instrumentation.retransformClasses(classArray);
-
                 com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
             }
         } catch (Exception e) {

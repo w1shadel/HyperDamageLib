@@ -25,4 +25,7 @@ public class ModItems {
     public static final RegistryObject<Item> DECAYSWORD = ITEMS.register("decay_sword", () ->
             new DecaySword(new Item.Properties().rarity(Rarity.EPIC).fireResistant())
     );
+    public static final RegistryObject<Item> DUMMY_CONTROLLER = ITEMS.register("dummy_controller", () ->
+            new com.maxwell.hyperdamagelib.item.DummyControllerItem(new Item.Properties().rarity(Rarity.EPIC).stacksTo(1))
+    );
 }

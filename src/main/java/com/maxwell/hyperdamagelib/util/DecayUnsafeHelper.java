@@ -4,8 +4,6 @@ import sun.misc.Unsafe;
 
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
-import java.util.Optional;
-import java.util.Random;
 
 public class DecayUnsafeHelper {
     public static final Unsafe UNSAFE;

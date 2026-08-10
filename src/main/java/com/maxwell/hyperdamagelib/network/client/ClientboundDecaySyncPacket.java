@@ -18,13 +18,15 @@ public class ClientboundDecaySyncPacket {
     private final boolean superInvincible;
     private final boolean keepCurrentHealth;
     private final float invincibleHealthValue;
+    private final boolean healBlocked;
 
-    public ClientboundDecaySyncPacket(int entityId, float decayAmount, boolean superInvincible, boolean keepCurrentHealth, float invincibleHealthValue) {
+    public ClientboundDecaySyncPacket(int entityId, float decayAmount, boolean superInvincible, boolean keepCurrentHealth, float invincibleHealthValue, boolean healBlocked) {
         this.entityId = entityId;
         this.decayAmount = decayAmount;
         this.superInvincible = superInvincible;
         this.keepCurrentHealth = keepCurrentHealth;
         this.invincibleHealthValue = invincibleHealthValue;
+        this.healBlocked = healBlocked;
     }
 
     public static void encode(ClientboundDecaySyncPacket msg, FriendlyByteBuf buf) {
@@ -33,6 +35,7 @@ public class ClientboundDecaySyncPacket {
         buf.writeBoolean(msg.superInvincible);
         buf.writeBoolean(msg.keepCurrentHealth);
         buf.writeFloat(msg.invincibleHealthValue);
+        buf.writeBoolean(msg.healBlocked);
     }
 
     public static ClientboundDecaySyncPacket decode(FriendlyByteBuf buf) {
@@ -41,7 +44,8 @@ public class ClientboundDecaySyncPacket {
                 buf.readFloat(),
                 buf.readBoolean(),
                 buf.readBoolean(),
-                buf.readFloat()
+                buf.readFloat(),
+                buf.readBoolean()
         );
     }
 
@@ -64,6 +68,7 @@ public class ClientboundDecaySyncPacket {
                 decay.setKeepCurrentHealth(this.keepCurrentHealth);
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
                 decay.setSuperInvincible(this.superInvincible);
+                decay.setHealBlocked(this.healBlocked);
                 if (this.superInvincible && entity instanceof LivingEntity living) {
                     living.dead = false;
                     living.deathTime = 0;

@@ -24,6 +24,7 @@ public final class DecayDamageUtil {
             Registries.DAMAGE_TYPE,
             new ResourceLocation("hyperdamagelib", "ultra_bypass_damage")
     );
+    public static final ThreadLocal<Boolean> FORCE_DAMAGE = ThreadLocal.withInitial(() -> false);
     public static final ThreadLocal<Boolean> BYPASS_DECAY = ThreadLocal.withInitial(() -> false);
     public static final ThreadLocal<Boolean> BYPASS_EFFECT = ThreadLocal.withInitial(() -> false);
 
@@ -131,7 +132,6 @@ public final class DecayDamageUtil {
     }
 
     public static boolean forceAddEffect(LivingEntity entity, MobEffectInstance effectInstance, @Nullable Entity source) {
-        
         try {
             BYPASS_EFFECT.set(true);
             return entity.addEffect(effectInstance, source);
@@ -184,7 +184,6 @@ public final class DecayDamageUtil {
 
     public static DamageSource getPenetrateSource(Level level, @Nullable Entity attacker, @Nullable String customDeathMessage) {
         DecaySecurity.checkReflectionAccess();
-        
         Holder<DamageType> holder;
         try {
             holder = level.registryAccess()
@@ -230,7 +229,6 @@ public final class DecayDamageUtil {
     }
 
     public static boolean shouldApplyBypass(DamageSource source) {
-        
         if (source.is(ULTRA_BYPASS_DAMAGE)) {
             return true;
         }

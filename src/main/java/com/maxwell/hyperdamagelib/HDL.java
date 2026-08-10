@@ -23,10 +23,12 @@ public class HDL {
     public HDL(FMLJavaModLoadingContext context) {
         IEventBus modEventBus = context.getModEventBus();
         ModItems.ITEMS.register(modEventBus);
+        com.maxwell.hyperdamagelib.init.ModEntities.ENTITY_TYPES.register(modEventBus);
         ModTabs.CREATIVE_TABS.register(modEventBus);
         ModEffects.EFFECTS.register(modEventBus);
         modEventBus.addListener(this::addCreativeContents);
         modEventBus.addListener(this::commonSetup);
+        modEventBus.addListener(this::entityAttributeSetup);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modEventBus.addListener(DecayClientSetup::onClientSetup);
         }
@@ -36,6 +38,9 @@ public class HDL {
         return new ResourceLocation(MODID, path);
     }
 
+    private void entityAttributeSetup(net.minecraftforge.event.entity.EntityAttributeCreationEvent event) {
+        event.put(com.maxwell.hyperdamagelib.init.ModEntities.MEASUREMENT_DUMMY.get(), com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity.createAttributes().build());
+    }
 
     private void addCreativeContents(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event) {
         if (event.getTab() == ModTabs.PRIME_TAB.get()) {

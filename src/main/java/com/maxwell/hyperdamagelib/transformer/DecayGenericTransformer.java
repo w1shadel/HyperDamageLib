@@ -57,6 +57,26 @@ public class DecayGenericTransformer {
                     method.maxStack = Math.max(method.maxStack, 1);
                     modified = true;
                 }
+                if ((method.name.equals("setRemoved") || method.name.equals("m_142687_")) &&
+                        method.desc.equals("(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) {
+                    InsnList insnList = new InsnList();
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            ENTITY_METHODS,
+                            "handleForceRemove",
+                            "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity$RemovalReason;)Z",
+                            false
+                    ));
+                    LabelNode label = new LabelNode();
+                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
+                    insnList.add(new InsnNode(Opcodes.RETURN));
+                    insnList.add(label);
+                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
             }
         }
         if (classNode.name.equals("net/minecraft/world/entity/LivingEntity") ||
@@ -80,6 +100,67 @@ public class DecayGenericTransformer {
                     insnList.add(label);
                     method.instructions.insertBefore(method.instructions.getFirst(), insnList);
                     method.maxStack = Math.max(method.maxStack, 1);
+                    modified = true;
+                }
+                if ((method.name.equals("removeEffect") || method.name.equals("m_21195_")) &&
+                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffect;)Z")) {
+                    String removeEffectNoUpdateName = FMLEnvironment.production ? "m_21124_" : "removeEffectNoUpdate";
+                    String onEffectRemovedName = FMLEnvironment.production ? "m_21196_" : "onEffectRemoved";
+                    InsnList insnList = new InsnList();
+                    insnList.add(new FieldInsnNode(Opcodes.GETSTATIC, "com/maxwell/hyperdamagelib/util/DecayDamageUtil", "BYPASS_EFFECT", "Ljava/lang/ThreadLocal;"));
+                    insnList.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/ThreadLocal", "get", "()Ljava/lang/Object;", false));
+                    insnList.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Boolean"));
+                    insnList.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false));
+                    LabelNode normalFlow = new LabelNode();
+                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, normalFlow));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL,
+                            "net/minecraft/world/entity/LivingEntity",
+                            removeEffectNoUpdateName,
+                            "(Lnet/minecraft/world/effect/MobEffect;)Lnet/minecraft/world/effect/MobEffectInstance;",
+                            false
+                    ));
+                    insnList.add(new InsnNode(Opcodes.DUP));
+                    LabelNode isNull = new LabelNode();
+                    insnList.add(new JumpInsnNode(Opcodes.IFNULL, isNull));
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    insnList.add(new InsnNode(Opcodes.SWAP));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKEVIRTUAL,
+                            "net/minecraft/world/entity/LivingEntity",
+                            onEffectRemovedName,
+                            "(Lnet/minecraft/world/effect/MobEffectInstance;)V",
+                            false
+                    ));
+                    insnList.add(new InsnNode(Opcodes.ICONST_1));
+                    insnList.add(new InsnNode(Opcodes.IRETURN));
+                    insnList.add(isNull);
+                    insnList.add(new InsnNode(Opcodes.POP));
+                    insnList.add(new InsnNode(Opcodes.ICONST_0));
+                    insnList.add(new InsnNode(Opcodes.IRETURN));
+                    insnList.add(normalFlow);
+                    insnList.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+                    method.maxStack = Math.max(method.maxStack, 3);
+                    modified = true;
+                }
+                if ((method.name.equals("heal") || method.name.equals("m_5634_")) &&
+                        method.desc.equals("(F)V")) {
+                    InsnList insnList = new InsnList();
+                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                    insnList.add(new VarInsnNode(Opcodes.FLOAD, 1));
+                    insnList.add(new MethodInsnNode(
+                            Opcodes.INVOKESTATIC,
+                            ENTITY_METHODS,
+                            "handleHeal",
+                            "(Lnet/minecraft/world/entity/LivingEntity;F)F",
+                            false
+                    ));
+                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1));
+                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+                    method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
                 if ((method.name.equals("removeAllEffects") || method.name.equals("m_21219_")) &&

@@ -39,6 +39,8 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private boolean keepCurrentHealth = false;
     @Unique
     private float invincibleHealthValue = 20.0f;
+    @Unique
+    private boolean healBlocked = false;
 
     @Unique
     private boolean decay$isLoginIncomplete() {
@@ -79,31 +81,25 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         float originalMax = (float) self.getAttributeValue(
                 net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
         );
-
         if (Float.isNaN(originalMax)) {
             originalMax = 20.0F;
         } else if (Float.isInfinite(originalMax)) {
-            originalMax = 1000000.0F; 
+            originalMax = 1000000.0F;
         }
-
         if (Float.isNaN(amount)) {
             amount = 0.0F;
         } else if (Float.isInfinite(amount)) {
             amount = originalMax;
         }
-
         this.decayAmount = Math.max(0.0f, Math.min(amount, originalMax));
         float cappedMax = originalMax - getDecayAmount();
-
         if (Float.isNaN(cappedMax) || cappedMax < 0.0F) {
             cappedMax = 0.0F;
         }
-
         float realHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         if (Float.isNaN(realHealth)) {
             realHealth = 0.0F;
         }
-
         if (realHealth > cappedMax || Float.isInfinite(realHealth)) {
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
@@ -119,6 +115,17 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     public void addDecayAmount(float amount) {
         this.setDecayAmount(this.decayAmount + amount);
         this.decayHoldTicks = 100;
+    }
+
+    @Override
+    public boolean isHealBlocked() {
+        return this.healBlocked;
+    }
+
+    @Override
+    public void setHealBlocked(boolean val) {
+        this.healBlocked = val;
+        decay$syncToTracking();
     }
 
     @Override
@@ -187,7 +194,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (self.level() != null && !self.level().isClientSide()) {
             ModMessages.INSTANCE.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> self),
-                    new ClientboundDecaySyncPacket(self.getId(), this.decayAmount, this.superInvincible, this.keepCurrentHealth, this.invincibleHealthValue)
+                    new ClientboundDecaySyncPacket(self.getId(), this.decayAmount, this.superInvincible, this.keepCurrentHealth, this.invincibleHealthValue, this.healBlocked)
             );
         }
     }
@@ -222,15 +229,21 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             return value;
         }
         LivingEntity self = (LivingEntity) (Object) this;
+        if (self instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                return dummy.getMaxHealth();
+            }
+        }
         if (this.superInvincible) {
+            if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.FORCE_DAMAGE.get()) {
+                return value;
+            }
             return decay$getTargetInvincibleHealth();
         }
         float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         if (Float.isNaN(currentHealth)) currentHealth = 0.0F;
-
         float maxHp = self.getMaxHealth();
         if (Float.isNaN(maxHp) || Float.isInfinite(maxHp)) maxHp = 1000000.0F;
-
         float cappedMax = Math.max(0.0f, maxHp - this.decayAmount);
         if (this.decayHoldTicks > 0 || this.decayAmount > 0.0f) {
             if (value > currentHealth) {
@@ -295,6 +308,16 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             return;
         }
         LivingEntity self = (LivingEntity) (Object) this;
+        if (self instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
+            if (!dummy.isRemoveBypass()) {
+                this.dead = false;
+                this.deathTime = 0;
+                if (self.getPose() == Pose.DYING) {
+                    self.setPose(Pose.STANDING);
+                }
+                self.setHealth(self.getMaxHealth());
+            }
+        }
         if (this.superInvincible) {
             if (this.dead || this.deathTime > 0) {
                 this.dead = false;
@@ -315,6 +338,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         nbt.putBoolean("super_invincible", this.superInvincible);
         nbt.putBoolean("keep_current_health", this.keepCurrentHealth);
         nbt.putFloat("invincible_health_value", this.invincibleHealthValue);
+        nbt.putBoolean("heal_blocked", this.healBlocked);
     }
 
     @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
@@ -330,6 +354,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
         if (nbt.contains("invincible_health_value")) {
             this.invincibleHealthValue = nbt.getFloat("invincible_health_value");
+        }
+        if (nbt.contains("heal_blocked")) {
+            this.healBlocked = nbt.getBoolean("heal_blocked");
         }
     }
 

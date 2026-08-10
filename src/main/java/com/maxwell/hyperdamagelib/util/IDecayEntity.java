@@ -48,4 +48,12 @@ public interface IDecayEntity {
 
     default void setInvincibleHealthValue(float val) {
     }
+
+    default boolean isHealBlocked() {
+        return false;
+    }
+
+    default void setHealBlocked(boolean val) {
+    }
+
 }

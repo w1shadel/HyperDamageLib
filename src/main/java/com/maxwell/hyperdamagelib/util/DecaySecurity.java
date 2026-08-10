@@ -1,8 +1,6 @@
 package com.maxwell.hyperdamagelib.util;
 
 public final class DecaySecurity {
-
-    
     public static void checkReflectionAccess() {
         if (isInvokedViaReflection()) {
             throw new SecurityException("Access denied: Dynamic reflection is prohibited on this method.");
