@@ -20,6 +20,7 @@ mixin {
     config "${mod_id}.mixins.json"
 }
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     accessTransformer file('src/main/resources/META-INF/accesstransformer.cfg')
@@ -30,7 +31,6 @@ minecraft {
             workingDirectory project.file('run')
 
             property 'forge.logging.markers', 'REGISTRIES'
-
             property 'forge.logging.console.level', 'debug'
 
             mods {
@@ -46,7 +46,6 @@ minecraft {
 
         server {
             property 'forge.enabledGameTestNamespaces', mod_id
-            // args '--nogui'
         }
 
         gameTestServer {
@@ -55,7 +54,6 @@ minecraft {
 
         data {
             workingDirectory project.file('run-data')
-
             args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
         }
     }
@@ -104,12 +102,29 @@ dependencies {
     implementation fg.deobf("curse.maven:better-combat-by-daedelus-639842:7287334")
     implementation fg.deobf("curse.maven:playeranimator-658587:4587214")
     implementation fg.deobf("curse.maven:imds-reborn-1008701:8538912")
-//    implementation fg.deobf("maven.modrinth:manaitamtk:1.7.1")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
+// 1. エージェント専用のクリーンなJARを作るタスク
+task agentJar(type: Jar) {
+    archiveClassifier = 'agent'
+    // 循環参照を完璧に防ぐため、Javaのコンパイルフォルダのみを指定
+    from compileJava.destinationDirectory
+    include 'com/maxwell/hyperdamagelib/agent/**'
+
+    manifest {
+        attributes(
+                'Manifest-Version': '1.0',
+                'Premain-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
+                'Agent-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
+                'Can-Redefine-Classes': 'true',
+                'Can-Retransform-Classes': 'true'
+        )
+    }
+}
+
 tasks.named('processResources', ProcessResources).configure {
-    dependsOn agentJar
+    dependsOn agentJar // エージェントJARのコンパイル完了を待つ
 
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
@@ -124,26 +139,11 @@ tasks.named('processResources', ProcessResources).configure {
         expand replaceProperties + [project: project]
     }
 
+    // 【重要】リソース処理の段階で META-INF/jarjar に同梱する
+    // これにより開発環境（build/resources/main）と製品版JARの両方に自動適用されます
     from(agentJar) {
         into 'META-INF/jarjar'
         rename { 'decay-agent.jar' }
-    }
-}
-
-task agentJar(type: Jar) {
-    archiveClassifier = 'agent'
-
-    from compileJava.destinationDirectory
-    include 'com/maxwell/hyperdamagelib/agent/**'
-
-    manifest {
-        attributes(
-                'Manifest-Version': '1.0',
-                'Premain-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
-                'Agent-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
-                'Can-Redefine-Classes': 'true',
-                'Can-Retransform-Classes': 'true'
-        )
     }
 }
 
@@ -159,7 +159,6 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
-
     finalizedBy 'reobfJar'
 }
 

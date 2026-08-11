@@ -399,8 +399,11 @@ public class DecayGenericTransformer {
             }
             return modified;
         }
-        boolean shouldWrapInsn = ((availableGetBytecode && phase == Phase.GetBytecode) || (!availableGetBytecode && phase == Phase.ILaunchPluginServiceBefore));
-        boolean shouldModifyReturn = phase == Phase.ILaunchPluginService;
+
+
+        boolean shouldWrapInsn = (phase == Phase.GetBytecode);
+        boolean shouldModifyReturn = (phase == Phase.GetBytecode);
+
         for (MethodNode method : classNode.methods) {
             for (AbstractInsnNode insn : method.instructions) {
                 if (insn instanceof MethodInsnNode methodInsn) {
@@ -568,7 +571,9 @@ public class DecayGenericTransformer {
                     modified = true;
                 }
             }
-            if (!tickInjected && phase.ordinal() >= 2 && isSameMethod(classNode.name, method, "net/minecraft/server/level/ServerLevel", "m_8793_", "tick", "(Ljava/util/function/BooleanSupplier;)V", false)) {
+
+
+            if (!tickInjected && phase == Phase.GetBytecode && isSameMethod(classNode.name, method, "net/minecraft/server/level/ServerLevel", "m_8793_", "tick", "(Ljava/util/function/BooleanSupplier;)V", false)) {
                 InsnList insnList = new InsnList();
                 insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
                 insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "updateLastTicks", "(Lnet/minecraft/server/level/ServerLevel;)V", false));

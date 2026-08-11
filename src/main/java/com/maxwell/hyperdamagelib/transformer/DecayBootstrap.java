@@ -4,9 +4,6 @@ import com.maxwell.hyperdamagelib.agent.DecayAgent;
 import com.maxwell.hyperdamagelib.util.DecayUnsafeHelper;
 import com.sun.tools.attach.VirtualMachine;
 import cpw.mods.cl.ModuleClassLoader;
-import cpw.mods.modlauncher.LaunchPluginHandler;
-import cpw.mods.modlauncher.Launcher;
-import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,17 +13,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Field;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiFunction;
 
 public final class DecayBootstrap {
     private static final Logger LOGGER = LoggerFactory.getLogger("DecayBootstrap");
     private static final String AGENT_CLASS = "com.maxwell.hyperdamagelib.agent.DecayAgent";
-    private static final String AGENT_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayAgent.class";
     private static final String BRIDGE_CLASS = "com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge";
-    private static final String BRIDGE_RESOURCE = "com/maxwell/hyperdamagelib/agent/DecayBytecodeBridge.class";
-    public static volatile boolean LAUNCH_PLUGIN_AVAILABLE = false;
     static volatile Instrumentation instrumentation = null;
     private static volatile boolean STARTED = false;
 
@@ -43,9 +36,6 @@ public final class DecayBootstrap {
         DecaySynchedEntityDataMethods.class.getClass();
         try {
             LOGGER.debug("Initialize Decay Transformer Start");
-            if (!LAUNCH_PLUGIN_AVAILABLE) {
-                LAUNCH_PLUGIN_AVAILABLE = initLaunchPlugin();
-            }
             if (instrumentation == null) {
                 if (!initAgent()) return;
                 instrumentation = fetchInstrumentation();
@@ -60,24 +50,6 @@ public final class DecayBootstrap {
         }
     }
 
-    private static boolean initLaunchPlugin() {
-        try {
-            ILaunchPluginService plugin = new DecayLaunchPlugin();
-            Field field = Launcher.class.getDeclaredField("launchPlugins");
-            DecayUnsafeHelper.forceSetAccessible(field);
-            LaunchPluginHandler pluginHandler = (LaunchPluginHandler) field.get(Launcher.INSTANCE);
-            field = LaunchPluginHandler.class.getDeclaredField("plugins");
-            DecayUnsafeHelper.forceSetAccessible(field);
-            @SuppressWarnings("unchecked")
-            Map<String, ILaunchPluginService> map = (Map<String, ILaunchPluginService>) field.get(pluginHandler);
-            map.put(plugin.name(), plugin);
-            return true;
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            LOGGER.error("Failed to init launch plugin: " + e);
-            return false;
-        }
-    }
-
     private static boolean initAgent() {
         try {
             if (!DecayUnsafeHelper.allowAttachSelf()) {
@@ -85,6 +57,7 @@ public final class DecayBootstrap {
             }
             File agentJar = extractAgentJar();
             LOGGER.debug("Agent jar extracted to: {}", agentJar.getAbsolutePath());
+
             String pid = String.valueOf(ProcessHandle.current().pid());
             VirtualMachine vm = VirtualMachine.attach(pid);
             try {
@@ -128,19 +101,14 @@ public final class DecayBootstrap {
         if (is == null) {
             throw new IOException("Embedded agent JAR not found in resources: " + resourcePath);
         }
+
         File tempFile = File.createTempFile("decay-agent-", ".jar");
         tempFile.deleteOnExit();
+
         try (FileOutputStream os = new FileOutputStream(tempFile)) {
             is.transferTo(os);
         }
         return tempFile;
-    }
-
-    private static byte[] readResource(String resource) throws IOException {
-        try (InputStream in = DecayAgent.class.getClassLoader().getResourceAsStream(resource)) {
-            if (in == null) throw new IOException("Resource not found: " + resource);
-            return in.readAllBytes();
-        }
     }
 
     public static void verifyAndRetransform() {
@@ -163,6 +131,7 @@ public final class DecayBootstrap {
             if (!classesToRetransform.isEmpty()) {
                 Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
                 instrumentation.retransformClasses(classArray);
+
                 com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
             }
         } catch (Exception e) {
