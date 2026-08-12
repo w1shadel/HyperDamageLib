@@ -91,7 +91,6 @@ sourceSets.main.resources {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    // Byte Buddy Agent を MODに同梱します
     shadow 'net.bytebuddy:byte-buddy-agent:1.18.8'
 
     implementation fg.deobf("curse.maven:spark-361579:4738952")
@@ -115,7 +114,6 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-// 1. エージェントクラス（DecayAgent, DecayBytecodeBridge）だけを固めた最小JARを作成します
 task agentJar(type: Jar) {
     archiveClassifier = 'agent'
     from compileJava.destinationDirectory
@@ -133,7 +131,7 @@ task agentJar(type: Jar) {
 }
 
 tasks.named('processResources', ProcessResources).configure {
-    dependsOn agentJar // エージェントJARのコンパイル完了を待つ
+    dependsOn agentJar
 
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
@@ -148,14 +146,12 @@ tasks.named('processResources', ProcessResources).configure {
         expand replaceProperties + [project: project]
     }
 
-    // 2. 作成した最小エージェントJARを製品版の META-INF/jarjar に同梱
     from(agentJar) {
         into 'META-INF/jarjar'
         rename { 'decay-agent.jar' }
     }
 }
 
-// 生の JAR は一時ファイルとします
 tasks.named('jar', Jar).configure {
     archiveClassifier = 'raw'
     manifest {
@@ -171,7 +167,6 @@ tasks.named('jar', Jar).configure {
     }
 }
 
-// 3. ShadowJARの設定（ByteBuddyを同梱・改名）
 shadowJar {
     archiveClassifier = ''
     configurations = [project.configurations.shadow]
@@ -188,8 +183,6 @@ tasks.named('shadowJar').configure {
     finalizedBy 'reobfShadowJar'
 }
 
-// 開発環境（IDE）で ModuleClassLoader が Byte Buddy を読み込めるように、
-// コンパイルの直後に shadow 構成の JAR を解凍して、コンパイル出力フォルダに直接展開します。
 compileJava.doLast {
     configurations.shadow.each { file ->
         copy {
