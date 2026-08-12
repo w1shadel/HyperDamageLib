@@ -20,7 +20,14 @@ public class DecayBytecodeGetterTransformer implements ClassFileTransformer {
     private static final Logger LOGGER = LoggerFactory.getLogger("DecayBytecodeGetterTransformer");
 
     public static Optional<byte[]> transformOptionalBytes(Optional<byte[]> optionalBytes, String className) {
-        if (optionalBytes.isEmpty() || DecayGenericTransformer.exclusivePackages.stream().anyMatch(className::startsWith)) {
+        if (optionalBytes.isEmpty() || className == null) {
+            return optionalBytes;
+        }
+        String internalName = className.replace('.', '/');
+        if (internalName.startsWith("com/maxwell/hyperdamagelib/transformer") ||
+                internalName.startsWith("com/maxwell/hyperdamagelib/agent") ||
+                internalName.startsWith("com/maxwell/hyperdamagelib/shadow/bytebuddy") ||
+                internalName.startsWith("net/bytebuddy")) {
             return optionalBytes;
         }
         byte[] bytes = optionalBytes.orElse(new byte[0]);
@@ -30,6 +37,7 @@ public class DecayBytecodeGetterTransformer implements ClassFileTransformer {
             ClassReader classReader = new ClassReader(bytes);
             classNode = new ClassNode(Opcodes.ASM9);
             classReader.accept(classNode, ClassReader.EXPAND_FRAMES);
+            DecayGenericTransformer.registerClassHierarchy(classNode.name, classNode.superName);
             modified = DecayGenericTransformer.transform(DecayGenericTransformer.Phase.GetBytecode, classNode);
         } catch (Throwable t) {
             LOGGER.error("transformOptionalBytes: read/transform failed for {} ({}): {}", className, t.getClass().getName(), t.getMessage(), t);

@@ -3,6 +3,7 @@ package com.maxwell.hyperdamagelib.transformer;
 import com.maxwell.hyperdamagelib.effect.DecayMobEffect;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
+import com.maxwell.hyperdamagelib.util.DecaySecurityHelper;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket;
 import net.minecraft.server.level.ServerPlayer;
@@ -139,7 +140,7 @@ public class DecayEntityMethods {
                 }
             }
             if (activeEffectsField != null) {
-                com.maxwell.hyperdamagelib.util.DecayUnsafeHelper.forceSetAccessible(activeEffectsField);
+                DecaySecurityHelper.forceSetAccessible(activeEffectsField);
                 activeEffects = (java.util.Map<MobEffect, MobEffectInstance>) activeEffectsField.get(entity);
             }
         } catch (Throwable t) {
@@ -181,7 +182,7 @@ public class DecayEntityMethods {
                 }
             }
             if (dirtyField != null) {
-                com.maxwell.hyperdamagelib.util.DecayUnsafeHelper.forceSetAccessible(dirtyField);
+                DecaySecurityHelper.forceSetAccessible(dirtyField);
                 dirtyField.setBoolean(entity, true);
             }
         } catch (Throwable ignored) {

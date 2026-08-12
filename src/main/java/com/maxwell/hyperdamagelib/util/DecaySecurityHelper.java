@@ -5,7 +5,7 @@ import sun.misc.Unsafe;
 import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Field;
 
-public class DecayUnsafeHelper {
+public class DecaySecurityHelper {
     public static final Unsafe UNSAFE;
     public static final boolean AVAILABLE;
     public static final long OVERRIDE_OFFSET = 12;
@@ -22,23 +22,6 @@ public class DecayUnsafeHelper {
         }
         UNSAFE = unsafe;
         AVAILABLE = available;
-    }
-
-    public static boolean allowAttachSelf() {
-        if (!AVAILABLE) return false;
-        try {
-            Class<?> clazz = Class.forName("sun.tools.attach.HotSpotVirtualMachine");
-            for (Field f : clazz.getDeclaredFields()) {
-                if (f.getType() == boolean.class && f.getName().equals("ALLOW_ATTACH_SELF")) {
-                    long offset = UNSAFE.staticFieldOffset(f);
-                    Object base = UNSAFE.staticFieldBase(f);
-                    UNSAFE.putBoolean(base, offset, true);
-                    return true;
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return false;
     }
 
     public static boolean forceSetAccessible(AccessibleObject accessibleObject) {

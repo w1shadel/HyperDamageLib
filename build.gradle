@@ -5,6 +5,7 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
+    id 'com.github.johnrengelman.shadow' version '8.1.1' // Shadow プラグイン
 }
 
 version = mod_version
@@ -59,6 +60,11 @@ minecraft {
     }
 }
 
+configurations {
+    shadow
+    implementation.extendsFrom shadow
+}
+
 repositories {
     maven {
         name "JEI"
@@ -84,6 +90,10 @@ sourceSets.main.resources {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    // Byte Buddy Agent を MODに同梱します
+    shadow 'net.bytebuddy:byte-buddy-agent:1.18.8'
+
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:appleskin-248787:4770828")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
@@ -105,10 +115,9 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-// 1. エージェント専用のクリーンなJARを作るタスク
+// 1. エージェントクラス（DecayAgent, DecayBytecodeBridge）だけを固めた最小JARを作成します
 task agentJar(type: Jar) {
     archiveClassifier = 'agent'
-    // 循環参照を完璧に防ぐため、Javaのコンパイルフォルダのみを指定
     from compileJava.destinationDirectory
     include 'com/maxwell/hyperdamagelib/agent/**'
 
@@ -139,15 +148,16 @@ tasks.named('processResources', ProcessResources).configure {
         expand replaceProperties + [project: project]
     }
 
-    // 【重要】リソース処理の段階で META-INF/jarjar に同梱する
-    // これにより開発環境（build/resources/main）と製品版JARの両方に自動適用されます
+    // 2. 作成した最小エージェントJARを製品版の META-INF/jarjar に同梱
     from(agentJar) {
         into 'META-INF/jarjar'
         rename { 'decay-agent.jar' }
     }
 }
 
+// 生の JAR は一時ファイルとします
 tasks.named('jar', Jar).configure {
+    archiveClassifier = 'raw'
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
@@ -159,13 +169,41 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
-    finalizedBy 'reobfJar'
+}
+
+// 3. ShadowJARの設定（ByteBuddyを同梱・改名）
+shadowJar {
+    archiveClassifier = ''
+    configurations = [project.configurations.shadow]
+    relocate 'net.bytebuddy.agent', 'com.maxwell.hyperdamagelib.shadow.bytebuddy.agent'
+    exclude 'META-INF/maven/**'
+    exclude 'LICENSE'
+}
+
+reobf {
+    shadowJar {}
+}
+
+tasks.named('shadowJar').configure {
+    finalizedBy 'reobfShadowJar'
+}
+
+// 開発環境（IDE）で ModuleClassLoader が Byte Buddy を読み込めるように、
+// コンパイルの直後に shadow 構成の JAR を解凍して、コンパイル出力フォルダに直接展開します。
+compileJava.doLast {
+    configurations.shadow.each { file ->
+        copy {
+            from zipTree(file)
+            into compileJava.destinationDirectory
+            exclude 'META-INF/**'
+        }
+    }
 }
 
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
-            artifact jar
+            artifact shadowJar
         }
     }
     repositories {

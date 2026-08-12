@@ -1,6 +1,7 @@
 package com.maxwell.hyperdamagelib.mixin.client;
 
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
@@ -18,9 +19,13 @@ public abstract class ClientPacketListenerMixin {
 
     @Inject(method = "handleRemoveEntities", at = @At("HEAD"))
     public void handleRemoveEntitiesBeforeMixin(ClientboundRemoveEntitiesPacket packet, CallbackInfo ci) {
+        Minecraft mc = Minecraft.getInstance();
         packet.getEntityIds().forEach((id) -> {
             Entity entity = this.level.getEntity(id);
             if (entity instanceof IDecayEntity decay) {
+                if (mc.player != null && entity.getId() == mc.player.getId()) {
+                    return;
+                }
                 decay.setRemoveBypass(true);
             }
         });
@@ -28,9 +33,13 @@ public abstract class ClientPacketListenerMixin {
 
     @Inject(method = "handleRemoveEntities", at = @At("RETURN"))
     public void handleRemoveEntitiesAfterMixin(ClientboundRemoveEntitiesPacket packet, CallbackInfo ci) {
+        Minecraft mc = Minecraft.getInstance();
         packet.getEntityIds().forEach((id) -> {
             Entity entity = this.level.getEntity(id);
             if (entity instanceof IDecayEntity decay) {
+                if (mc.player != null && entity.getId() == mc.player.getId()) {
+                    return;
+                }
                 decay.setRemoveBypass(false);
             }
         });

@@ -1,21 +1,17 @@
 package com.maxwell.hyperdamagelib.transformer;
 
-import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.fml.loading.FMLEnvironment;
-import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class DecayGenericTransformer {
     static final String ENTITY_METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
-    static final String ONLYIN_DESC = Type.getDescriptor(OnlyIn.class);
-    static final String FML_DIST = FMLEnvironment.dist.toString();
+    private static final Map<String, String> SUPER_CLASS_MAP = new java.util.concurrent.ConcurrentHashMap<>();
     public static List<String> exclusivePackages = new ArrayList<>();
     static boolean initialized = false;
     static boolean availableGetBytecode = false;
@@ -29,6 +25,8 @@ public class DecayGenericTransformer {
         if (initialized) return;
         exclusivePackages.add("com/maxwell/hyperdamagelib/transformer");
         exclusivePackages.add("com/maxwell/hyperdamagelib/agent");
+        exclusivePackages.add("com/maxwell/hyperdamagelib/shadow/bytebuddy");
+        exclusivePackages.add("net/bytebuddy");
         initialized = true;
     }
 
@@ -399,11 +397,8 @@ public class DecayGenericTransformer {
             }
             return modified;
         }
-
-
         boolean shouldWrapInsn = (phase == Phase.GetBytecode);
         boolean shouldModifyReturn = (phase == Phase.GetBytecode);
-
         for (MethodNode method : classNode.methods) {
             for (AbstractInsnNode insn : method.instructions) {
                 if (insn instanceof MethodInsnNode methodInsn) {
@@ -571,8 +566,6 @@ public class DecayGenericTransformer {
                     modified = true;
                 }
             }
-
-
             if (!tickInjected && phase == Phase.GetBytecode && isSameMethod(classNode.name, method, "net/minecraft/server/level/ServerLevel", "m_8793_", "tick", "(Ljava/util/function/BooleanSupplier;)V", false)) {
                 InsnList insnList = new InsnList();
                 insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
@@ -614,48 +607,22 @@ public class DecayGenericTransformer {
         return isSubclass(owner, superClass, isInterface);
     }
 
-    public static boolean isSubclass(String className, String superClass, boolean isInterface) {
-        if (className.equals(superClass) || superClass.equals("java/lang/Object")) return true;
-        if (className.equals("java/lang/Object")) return false;
-        if (className.contains("__") || className.contains("$$") ||
-                className.startsWith("java/") ||
-                className.startsWith("javax/") ||
-                className.startsWith("sun/") ||
-                className.startsWith("com/sun/") ||
-                className.startsWith("jdk/") ||
-                className.startsWith("org/lwjgl/") ||
-                className.startsWith("org/apache/") ||
-                className.startsWith("io/netty/") ||
-                className.startsWith("com/google/") ||
-                className.startsWith("org/spongepowered/")) {
-            return false;
+    public static void registerClassHierarchy(String className, String superName) {
+        if (className != null && superName != null) {
+            SUPER_CLASS_MAP.put(className.replace('.', '/'), superName.replace('.', '/'));
         }
-        String currentName = className;
-        ClassLoader classLoader = DecayGenericTransformer.class.getClassLoader();
-        if (classLoader == null) {
-            classLoader = Thread.currentThread().getContextClassLoader();
-        }
-        while (!currentName.equals("java/lang/Object")) {
-            if (currentName.contains("__") || currentName.contains("$$")) {
-                return false;
-            }
-            try (InputStream is = classLoader.getResourceAsStream(currentName.concat(".class"))) {
-                if (is == null) {
-                    return false;
-                }
-                ClassReader classReader = new ClassReader(is);
-                currentName = classReader.getSuperName();
-                if (currentName == null) {
-                    currentName = "java/lang/Object";
-                }
-                if (currentName.equals(superClass)) return true;
-                if (isInterface) {
-                    for (String interfaceName : classReader.getInterfaces()) {
-                        if (isSubclass(interfaceName, superClass, true)) return true;
-                    }
-                }
-            } catch (Throwable e) {
-                return false;
+    }
+
+    public static boolean isSubclass(String className, String targetSuperClass, boolean isInterface) {
+        if (className == null || targetSuperClass == null) return false;
+        String current = className.replace('.', '/');
+        String target = targetSuperClass.replace('.', '/');
+        if (current.equals(target) || target.equals("java/lang/Object")) return true;
+        int maxDepth = 100;
+        while (current != null && !current.equals("java/lang/Object") && maxDepth-- > 0) {
+            current = SUPER_CLASS_MAP.get(current);
+            if (target.equals(current)) {
+                return true;
             }
         }
         return false;

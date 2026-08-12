@@ -2,7 +2,7 @@ package com.maxwell.hyperdamagelib.transformer;
 
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
-import com.maxwell.hyperdamagelib.util.DecayUnsafeHelper;
+import com.maxwell.hyperdamagelib.util.DecaySecurityHelper;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -21,11 +21,11 @@ public class DecaySynchedEntityDataMethods {
             if (initialized) return;
             try {
                 entityField = clazz.getDeclaredField("entity");
-                DecayUnsafeHelper.forceSetAccessible(entityField);
+                DecaySecurityHelper.forceSetAccessible(entityField);
             } catch (Throwable t) {
                 try {
                     entityField = clazz.getDeclaredField("f_135344_");
-                    DecayUnsafeHelper.forceSetAccessible(entityField);
+                    DecaySecurityHelper.forceSetAccessible(entityField);
                 } catch (Throwable ignored) {
                 }
             }

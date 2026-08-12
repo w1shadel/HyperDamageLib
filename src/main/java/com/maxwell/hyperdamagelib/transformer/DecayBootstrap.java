@@ -1,24 +1,22 @@
 package com.maxwell.hyperdamagelib.transformer;
 
-import com.maxwell.hyperdamagelib.agent.DecayAgent;
-import com.maxwell.hyperdamagelib.util.DecayUnsafeHelper;
-import com.sun.tools.attach.VirtualMachine;
-import cpw.mods.cl.ModuleClassLoader;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.maxwell.hyperdamagelib.HDL;
+import com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge;
+import net.bytebuddy.agent.ByteBuddyAgent;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.instrument.Instrumentation;
-import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.BiFunction;
+import java.util.jar.JarFile;
 
 public final class DecayBootstrap {
-    private static final Logger LOGGER = LoggerFactory.getLogger("DecayBootstrap");
-    private static final String AGENT_CLASS = "com.maxwell.hyperdamagelib.agent.DecayAgent";
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger("DecayBootstrap");
     private static final String BRIDGE_CLASS = "com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge";
     static volatile Instrumentation instrumentation = null;
     private static volatile boolean STARTED = false;
@@ -32,66 +30,31 @@ public final class DecayBootstrap {
             if (STARTED) return;
             STARTED = true;
         }
-        DecayEntityMethods.class.getClass();
-        DecaySynchedEntityDataMethods.class.getClass();
         try {
-            LOGGER.debug("Initialize Decay Transformer Start");
-            if (instrumentation == null) {
-                if (!initAgent()) return;
-                instrumentation = fetchInstrumentation();
-                if (instrumentation == null) return;
-                Class.forName("com.maxwell.hyperdamagelib.transformer.DecayBytecodeGetterTransformer");
-                if (!registerBridge()) return;
+            LOGGER.info("[HDL] Starting secure JVM instrumentation bootstrap...");
+            ByteBuddyAgent.install();
+            instrumentation = ByteBuddyAgent.getInstrumentation();
+            if (instrumentation != null) {
+                LOGGER.info("[HDL] Instrumentation successfully acquired via ByteBuddy.");
+                File agentJar = extractAgentJar();
+                JarFile jarFile = new JarFile(agentJar);
+                instrumentation.appendToBootstrapClassLoaderSearch(jarFile);
+                LOGGER.info("[HDL] Successfully appended decay-agent.jar to Bootstrap class loader search path.");
+                registerBridge();
                 instrumentation.addTransformer(new DecayBytecodeGetterTransformer(), true);
-                instrumentation.retransformClasses(ModuleClassLoader.class);
+                try {
+                    Class<?> classLoaderClass = Class.forName("cpw.mods.cl.ModuleClassLoader");
+                    instrumentation.retransformClasses(classLoaderClass);
+                    LOGGER.info("[HDL] ModuleClassLoader successfully hacked & retransformed.");
+                } catch (ClassNotFoundException e) {
+                    LOGGER.error("[HDL] ModuleClassLoader class not found! Hook failed.", e);
+                }
+
+            } else {
+                LOGGER.error("[HDL] ByteBuddy returned null Instrumentation!");
             }
         } catch (Throwable t) {
-            LOGGER.error("DecayBootstrap.start failed", t);
-        }
-    }
-
-    private static boolean initAgent() {
-        try {
-            if (!DecayUnsafeHelper.allowAttachSelf()) {
-                LOGGER.debug("Could not force attach-self via Unsafe; relying on -Djdk.attach.allowAttachSelf");
-            }
-            File agentJar = extractAgentJar();
-            LOGGER.debug("Agent jar extracted to: {}", agentJar.getAbsolutePath());
-
-            String pid = String.valueOf(ProcessHandle.current().pid());
-            VirtualMachine vm = VirtualMachine.attach(pid);
-            try {
-                vm.loadAgent(agentJar.getAbsolutePath());
-            } finally {
-                vm.detach();
-            }
-            return true;
-        } catch (Throwable t) {
-            LOGGER.error("Agent load failed", t);
-            return false;
-        }
-    }
-
-    private static Instrumentation fetchInstrumentation() {
-        try {
-            Class<?> agentSys = Class.forName(AGENT_CLASS, true, ClassLoader.getSystemClassLoader());
-            return (Instrumentation) agentSys.getField("INSTRUMENTATION").get(null);
-        } catch (Throwable t) {
-            LOGGER.error("Instrumentation handle unavailable", t);
-            return null;
-        }
-    }
-
-    private static boolean registerBridge() {
-        try {
-            Class<?> bridgeCls = Class.forName(BRIDGE_CLASS, true, ClassLoader.getSystemClassLoader());
-            Field f = bridgeCls.getField("transformer");
-            BiFunction<Optional<byte[]>, String, Optional<byte[]>> fn = DecayBytecodeGetterTransformer::transformOptionalBytes;
-            f.set(null, fn);
-            return true;
-        } catch (Throwable t) {
-            LOGGER.error("BytecodeBridge registration failed", t);
-            return false;
+            LOGGER.error("[HDL] Critical error during DecayBootstrap.start()", t);
         }
     }
 
@@ -101,20 +64,49 @@ public final class DecayBootstrap {
         if (is == null) {
             throw new IOException("Embedded agent JAR not found in resources: " + resourcePath);
         }
-
-        File tempFile = File.createTempFile("decay-agent-", ".jar");
+        java.nio.file.Path tempPath;
+        try {
+            java.nio.file.attribute.FileAttribute<?>[] attrs = new java.nio.file.attribute.FileAttribute<?>[0];
+            if (java.nio.file.FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+                java.util.Set<java.nio.file.attribute.PosixFilePermission> perms =
+                        java.nio.file.attribute.PosixFilePermissions.fromString("rw-------");
+                attrs = new java.nio.file.attribute.FileAttribute<?>[]{
+                        java.nio.file.attribute.PosixFilePermissions.asFileAttribute(perms)
+                };
+            }
+            tempPath = java.nio.file.Files.createTempFile("decay-agent-", ".jar", attrs);
+        } catch (UnsupportedOperationException e) {
+            tempPath = java.nio.file.Files.createTempFile("decay-agent-", ".jar");
+        }
+        File tempFile = tempPath.toFile();
         tempFile.deleteOnExit();
-
+        tempFile.setReadable(true, true);
+        tempFile.setWritable(true, true);
+        tempFile.setExecutable(false, false);
         try (FileOutputStream os = new FileOutputStream(tempFile)) {
             is.transferTo(os);
         }
         return tempFile;
     }
 
-    public static void verifyAndRetransform() {
-        if (instrumentation == null) return;
+    private static boolean registerBridge() {
         try {
-            java.util.List<Class<?>> classesToRetransform = new java.util.ArrayList<>();
+            BiFunction<Optional<byte[]>, String, Optional<byte[]>> fn = DecayBytecodeGetterTransformer::transformOptionalBytes;
+            DecayBytecodeBridge.setTransformer(fn);
+            return true;
+        } catch (Throwable t) {
+            LOGGER.error("BytecodeBridge registration failed", t);
+            return false;
+        }
+    }
+
+    public static void verifyAndRetransform() {
+        if (instrumentation == null) {
+            LOGGER.warn("[HDL] Instrumentation is null, skipping class retransformation.");
+            return;
+        }
+        try {
+            List<Class<?>> classesToRetransform = new ArrayList<>();
             for (Class<?> clazz : instrumentation.getAllLoadedClasses()) {
                 String name = clazz.getName();
                 if (name.equals("net.minecraft.world.entity.Entity") ||
@@ -131,11 +123,10 @@ public final class DecayBootstrap {
             if (!classesToRetransform.isEmpty()) {
                 Class<?>[] classArray = classesToRetransform.toArray(new Class<?>[0]);
                 instrumentation.retransformClasses(classArray);
-
-                com.maxwell.hyperdamagelib.HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
+                HDL.LOGGER.info("[HDL] Successfully retransformed " + classesToRetransform.size() + " target classes.");
             }
         } catch (Exception e) {
-            com.maxwell.hyperdamagelib.HDL.LOGGER.error("[HDL] Failed to bulk-retransform target classes", e);
+            HDL.LOGGER.error("[HDL] Failed to bulk-retransform target classes", e);
         }
     }
 }
