@@ -489,7 +489,7 @@ public class DecayEventHandler {
         MobEffectInstance instance = new MobEffectInstance(effect, durationTicks, amplifier, false, showParticles);
         for (net.minecraft.world.entity.Entity entity : targets) {
             if (entity instanceof LivingEntity living) {
-                DecayDamageUtil.forceAddEffect(living, instance, null);
+
                 count++;
             }
         }

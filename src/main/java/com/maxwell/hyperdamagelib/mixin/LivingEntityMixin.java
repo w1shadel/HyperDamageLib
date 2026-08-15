@@ -1,5 +1,6 @@
 package com.maxwell.hyperdamagelib.mixin;
 
+import com.maxwell.hyperdamagelib.init.ModDamageTypes;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
@@ -205,8 +206,20 @@ public abstract class LivingEntityMixin implements IDecayEntity {
 
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
     private void decay$preventHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (this.superInvincible) {
+        LivingEntity self = (LivingEntity) (Object) this;
+
+        if (InvincibleHelper.isInvincible(self)) {
             cir.setReturnValue(false);
+            cir.cancel();
+            return;
+        }
+
+        if (source.is(ModDamageTypes.EROSION) || source.is(ModDamageTypes.PENETRATE)) {
+            if (!DecayDamageUtil.BYPASS_DECAY.get()) {
+                boolean result = DecayDamageUtil.applyCustomDamage(self, source, amount);
+                cir.setReturnValue(result);
+                cir.cancel();
+            }
         }
     }
 

@@ -13,6 +13,23 @@ import java.util.function.Consumer;
 
 public class DecayEntityMethods {
 
+    public static boolean shouldInterceptHurt(LivingEntity entity, DamageSource source, float amount) {
+
+        if (InvincibleHelper.isInvincible(entity)) {
+            return true;
+        }
+
+        return source.is(ModDamageTypes.EROSION) || source.is(ModDamageTypes.PENETRATE);
+    }
+
+    public static boolean interceptHurt(LivingEntity entity, DamageSource source, float amount) {
+        if (InvincibleHelper.isInvincible(entity)) {
+            return false; 
+        }
+
+        return DecayDamageUtil.applyCustomDamage(entity, source, amount);
+    }
+
     public static boolean shouldReplaceHealthMethod(Entity entity) {
         if (DecayDamageUtil.BYPASS_DECAY.get()) return false;
         if (entity instanceof MeasurementDummyEntity) return true;
@@ -24,18 +41,9 @@ public class DecayEntityMethods {
             return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
         }
         if (InvincibleHelper.isInvincible(livingEntity)) {
-            float maxHealth = (float) livingEntity.getAttributeValue(
-                    net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
-            );
-            return Float.isNaN(maxHealth) || maxHealth < 20.0F ? 20.0F : maxHealth;
-        }
-
-        try {
-            Float rawHealth = livingEntity.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-            return rawHealth != null ? rawHealth : 20.0F;
-        } catch (Throwable t) {
             return 20.0F;
         }
+        return 20.0F;
     }
 
     public static float getHealth(float health, LivingEntity livingEntity) {
@@ -43,37 +51,20 @@ public class DecayEntityMethods {
             return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
         }
         if (InvincibleHelper.isInvincible(livingEntity)) {
-            float maxHealth = (float) livingEntity.getAttributeValue(
-                    net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
-            );
-            return Float.isNaN(maxHealth) || maxHealth < 20.0F ? 20.0F : maxHealth;
+            return 20.0F;
         }
         return health;
     }
-    public static boolean handleForceDamage(LivingEntity target, DamageSource source, float amount) {
-        if (source.is(ModDamageTypes.EROSION) || source.is(ModDamageTypes.PENETRATE)) {
-            DecayDamageUtil.applyCustomDamage(target, source, amount);
-            return true;
-        }
-        return false;
-    }
+
     public static boolean replaceIsDeadOrDying(Entity entity) {
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass();
-        }
-        if (InvincibleHelper.isInvincible(entity)) {
-            return false;
-        }
+        if (entity instanceof MeasurementDummyEntity dummy) return dummy.isRemoveBypass();
+        if (InvincibleHelper.isInvincible(entity)) return false;
         return false;
     }
 
     public static boolean isDeadOrDying(boolean deadOrDying, LivingEntity livingEntity) {
-        if (livingEntity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass() && deadOrDying;
-        }
-        if (InvincibleHelper.isInvincible(livingEntity)) {
-            return false;
-        }
+        if (livingEntity instanceof MeasurementDummyEntity dummy) return dummy.isRemoveBypass() && deadOrDying;
+        if (InvincibleHelper.isInvincible(livingEntity)) return false;
         return deadOrDying;
     }
 
@@ -82,32 +73,20 @@ public class DecayEntityMethods {
     }
 
     public static boolean isAlive(boolean alive, Entity entity) {
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return !dummy.isRemoveBypass() || alive;
-        }
-        if (InvincibleHelper.isInvincible(entity)) {
-            return true;
-        }
+        if (entity instanceof MeasurementDummyEntity dummy) return !dummy.isRemoveBypass() || alive;
+        if (InvincibleHelper.isInvincible(entity)) return true;
         return alive;
     }
 
     public static Entity.RemovalReason getRemovalReason(Entity.RemovalReason removalReason, Entity entity) {
-        if (entity instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) {
-            return null;
-        }
-        if (InvincibleHelper.isInvincible(entity)) {
-            return null;
-        }
+        if (entity instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) return null;
+        if (InvincibleHelper.isInvincible(entity)) return null;
         return removalReason;
     }
 
     public static boolean isRemoved(boolean removed, Entity entity) {
-        if (entity instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) {
-            return false;
-        }
-        if (InvincibleHelper.isInvincible(entity)) {
-            return false;
-        }
+        if (entity instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) return false;
+        if (InvincibleHelper.isInvincible(entity)) return false;
         return removed;
     }
 

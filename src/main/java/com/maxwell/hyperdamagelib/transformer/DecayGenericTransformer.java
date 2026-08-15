@@ -159,6 +159,11 @@ public class DecayGenericTransformer {
             }
 
             if (shouldModifyReturn) {
+                if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_6469_", "hurt", "(Lnet/minecraft/world/damagesource/DamageSource;F)Z", false)) {
+                    injectHurtHead(method);
+                    method.maxStack += 2;
+                    modified = true;
+                }
                 if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                     injectHead(method,
                             new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", false),
@@ -192,7 +197,39 @@ public class DecayGenericTransformer {
         }
         return modified;
     }
+    public static void injectHurtHead(MethodNode method) {
+        LabelNode skipLabel = new LabelNode(new Label());
+        InsnList insnList = new InsnList();
 
+        insnList.add(new VarInsnNode(Opcodes.ALOAD, 0)); 
+        insnList.add(new VarInsnNode(Opcodes.ALOAD, 1)); 
+        insnList.add(new VarInsnNode(Opcodes.FLOAD, 2)); 
+        insnList.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                ENTITY_METHODS,
+                "shouldInterceptHurt",
+                "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
+                false
+        ));
+        insnList.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel)); 
+
+        insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
+        insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
+        insnList.add(new VarInsnNode(Opcodes.FLOAD, 2));
+        insnList.add(new MethodInsnNode(
+                Opcodes.INVOKESTATIC,
+                ENTITY_METHODS,
+                "interceptHurt",
+                "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
+                false
+        ));
+        insnList.add(new InsnNode(Opcodes.IRETURN)); 
+
+        insnList.add(skipLabel);
+        insnList.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
+
+        method.instructions.insertBefore(method.instructions.getFirst(), insnList);
+    }
     public static void injectHead(MethodNode method, MethodInsnNode judgeMethod, MethodInsnNode replaceMethod, InsnNode returnInsn) {
         LabelNode skipLabelNode = new LabelNode(new Label());
         InsnList insnList = new InsnList();
