@@ -5,6 +5,7 @@ import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
@@ -136,9 +137,13 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @Override
     public void setSuperInvincible(boolean val) {
         LivingEntity self = (LivingEntity) (Object) this;
-        float currentRealHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         this.superInvincible = val;
         self.setInvulnerable(val);
+
+        // ★ トランスフォーマー用のUUIDセットと完全に連動させる！
+        InvincibleHelper.setInvincible(self, val);
+
+        float currentRealHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         if (val) {
             if (this.keepCurrentHealth) {
                 this.invincibleHealthValue = Math.max(1.0f, Math.min(currentRealHealth, self.getMaxHealth()));

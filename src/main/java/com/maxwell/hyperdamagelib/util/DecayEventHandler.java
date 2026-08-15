@@ -62,7 +62,7 @@ public class DecayEventHandler {
                             com.maxwell.hyperdamagelib.init.ModEffects.HEALING_SICKNESS.get(), 160, nextAmp
                     );
                     sicknessInstance.setCurativeItems(java.util.List.of());
-                    DecayDamageUtil.forceAddEffect(victim, sicknessInstance, livingAttacker);
+//                    DecayDamageUtil.forceAddEffect(victim, sicknessInstance, livingAttacker);
                 }
             }
         }
@@ -126,7 +126,6 @@ public class DecayEventHandler {
         if (player.level().isClientSide()) return;
         if (player instanceof IDecayEntity decay && decay.isSuperInvincible()) {
             if (player.isRemoved()) {
-                player.unsetRemoved();
                 player.setPose(net.minecraft.world.entity.Pose.STANDING);
                 player.dead = false;
                 player.deathTime = 0;
@@ -586,8 +585,6 @@ public class DecayEventHandler {
                 if (entity instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
                     dummy.setRemoveBypass(true);
                     dummy.discard();
-                } else if (entity != null) {
-                    entity.removalReason = net.minecraft.world.entity.Entity.RemovalReason.DISCARDED;
                 }
                 com.maxwell.hyperdamagelib.util.DecayForceKillHelper.removeFromMemory(entity != null ? entity : world.getEntity(uuid));
                 com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity newDummy = com.maxwell.hyperdamagelib.init.ModEntities.MEASUREMENT_DUMMY.get().create(world);

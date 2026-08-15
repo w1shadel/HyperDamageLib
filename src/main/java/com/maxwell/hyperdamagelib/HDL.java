@@ -50,6 +50,5 @@ public class HDL {
 
     private void commonSetup(final net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent event) {
         event.enqueueWork(ModMessages::register);
-        DecayBootstrap.verifyAndRetransform();
     }
 }

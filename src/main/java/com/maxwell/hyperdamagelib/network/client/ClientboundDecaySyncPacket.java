@@ -1,6 +1,7 @@
 package com.maxwell.hyperdamagelib.network.client;
 
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.Entity;
@@ -69,6 +70,10 @@ public class ClientboundDecaySyncPacket {
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
                 decay.setSuperInvincible(this.superInvincible);
                 decay.setHealBlocked(this.healBlocked);
+
+                // クライアント側のUUIDセットも同期
+                InvincibleHelper.setInvincible(entity, this.superInvincible);
+
                 if (this.superInvincible && entity instanceof LivingEntity living) {
                     living.dead = false;
                     living.deathTime = 0;

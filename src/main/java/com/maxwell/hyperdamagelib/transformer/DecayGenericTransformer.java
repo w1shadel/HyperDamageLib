@@ -1,21 +1,31 @@
 package com.maxwell.hyperdamagelib.transformer;
 
+import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.fml.loading.FMLEnvironment;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 public class DecayGenericTransformer {
     static final String ENTITY_METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
-    private static final Map<String, String> SUPER_CLASS_MAP = new java.util.concurrent.ConcurrentHashMap<>();
     public static List<String> exclusivePackages = new ArrayList<>();
+    public static List<String> exclusiveInstructionWrappingPackages = new ArrayList<>();
     static boolean initialized = false;
-    static boolean availableGetBytecode = false;
     static boolean tickInjected = false;
+    static final String ONLYIN_DESC = Type.getDescriptor(OnlyIn.class);
+    static final String FML_DIST = FMLEnvironment.dist.toString();
+    public static boolean availableGetBytecode = false;
+
+    public enum Phase {
+        GetBytecode, ILaunchPluginServiceBefore, ILaunchPluginService
+    }
 
     static {
         initialize();
@@ -25,8 +35,7 @@ public class DecayGenericTransformer {
         if (initialized) return;
         exclusivePackages.add("com/maxwell/hyperdamagelib/transformer");
         exclusivePackages.add("com/maxwell/hyperdamagelib/agent");
-        exclusivePackages.add("com/maxwell/hyperdamagelib/shadow/bytebuddy");
-        exclusivePackages.add("net/bytebuddy");
+        exclusivePackages.add("com/maxwell/hyperdamagelib/shadow");
         initialized = true;
     }
 
@@ -34,384 +43,16 @@ public class DecayGenericTransformer {
         if (exclusivePackages.stream().anyMatch(packageName -> classNode.name.startsWith(packageName)))
             return false;
         boolean modified = false;
-        if (classNode.name.equals("net/minecraft/world/entity/Entity")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.name.equals("kill") || method.name.equals("m_6074_")) &&
-                        method.desc.equals("()V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceKill",
-                            "(Lnet/minecraft/world/entity/Entity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 1);
-                    modified = true;
-                }
-                if ((method.name.equals("setRemoved") || method.name.equals("m_142687_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceRemove",
-                            "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity$RemovalReason;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-            }
-        }
-        if (classNode.name.equals("net/minecraft/world/entity/LivingEntity") ||
-                isSubclass(classNode.name, "net/minecraft/world/entity/LivingEntity", false)) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.name.equals("removeEffect") || method.name.equals("m_21195_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffect;)Z")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "shouldPreventEffectRemoval",
-                            "(Lnet/minecraft/world/effect/MobEffect;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.ICONST_0));
-                    insnList.add(new InsnNode(Opcodes.IRETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 1);
-                    modified = true;
-                }
-                if ((method.name.equals("removeEffect") || method.name.equals("m_21195_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffect;)Z")) {
-                    String removeEffectNoUpdateName = FMLEnvironment.production ? "m_21124_" : "removeEffectNoUpdate";
-                    String onEffectRemovedName = FMLEnvironment.production ? "m_21196_" : "onEffectRemoved";
-                    InsnList insnList = new InsnList();
-                    insnList.add(new FieldInsnNode(Opcodes.GETSTATIC, "com/maxwell/hyperdamagelib/util/DecayDamageUtil", "BYPASS_EFFECT", "Ljava/lang/ThreadLocal;"));
-                    insnList.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/ThreadLocal", "get", "()Ljava/lang/Object;", false));
-                    insnList.add(new TypeInsnNode(Opcodes.CHECKCAST, "java/lang/Boolean"));
-                    insnList.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false));
-                    LabelNode normalFlow = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, normalFlow));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKEVIRTUAL,
-                            "net/minecraft/world/entity/LivingEntity",
-                            removeEffectNoUpdateName,
-                            "(Lnet/minecraft/world/effect/MobEffect;)Lnet/minecraft/world/effect/MobEffectInstance;",
-                            false
-                    ));
-                    insnList.add(new InsnNode(Opcodes.DUP));
-                    LabelNode isNull = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFNULL, isNull));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new InsnNode(Opcodes.SWAP));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKEVIRTUAL,
-                            "net/minecraft/world/entity/LivingEntity",
-                            onEffectRemovedName,
-                            "(Lnet/minecraft/world/effect/MobEffectInstance;)V",
-                            false
-                    ));
-                    insnList.add(new InsnNode(Opcodes.ICONST_1));
-                    insnList.add(new InsnNode(Opcodes.IRETURN));
-                    insnList.add(isNull);
-                    insnList.add(new InsnNode(Opcodes.POP));
-                    insnList.add(new InsnNode(Opcodes.ICONST_0));
-                    insnList.add(new InsnNode(Opcodes.IRETURN));
-                    insnList.add(normalFlow);
-                    insnList.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 3);
-                    modified = true;
-                }
-                if ((method.name.equals("heal") || method.name.equals("m_5634_")) &&
-                        method.desc.equals("(F)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.FLOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleHeal",
-                            "(Lnet/minecraft/world/entity/LivingEntity;F)F",
-                            false
-                    ));
-                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1));
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-                if ((method.name.equals("removeAllEffects") || method.name.equals("m_21219_")) &&
-                        method.desc.equals("()Z")) {
-                    InsnList headInsns = new InsnList();
-                    headInsns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    headInsns.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "preserveDecayEffects",
-                            "(Lnet/minecraft/world/entity/LivingEntity;)V",
-                            false
-                    ));
-                    method.instructions.insertBefore(method.instructions.getFirst(), headInsns);
-                    for (AbstractInsnNode insn : method.instructions.toArray()) {
-                        if (insn.getOpcode() == Opcodes.IRETURN) {
-                            InsnList restoreInsns = new InsnList();
-                            restoreInsns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                            restoreInsns.add(new MethodInsnNode(
-                                    Opcodes.INVOKESTATIC,
-                                    ENTITY_METHODS,
-                                    "restoreDecayEffects",
-                                    "(Lnet/minecraft/world/entity/LivingEntity;)V",
-                                    false
-                            ));
-                            method.instructions.insertBefore(insn, restoreInsns);
-                        }
-                    }
-                    method.maxStack = Math.max(method.maxStack, 1);
-                    modified = true;
-                }
-                if ((method.name.equals("addEffect") || method.name.equals("m_7292_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 2));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceAddEffect",
-                            "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/effect/MobEffectInstance;Lnet/minecraft/world/entity/Entity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.ICONST_1));
-                    insnList.add(new InsnNode(Opcodes.IRETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 3);
-                    modified = true;
-                }
-                if ((method.name.equals("die") || method.name.equals("m_6667_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceDie",
-                            "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/damagesource/DamageSource;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-                if ((method.name.equals("hurt") || method.name.equals("m_6469_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)Z")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new VarInsnNode(Opcodes.FLOAD, 2));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceDamage",
-                            "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.ICONST_1));
-                    insnList.add(new InsnNode(Opcodes.IRETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 3);
-                    modified = true;
-                }
-                if ((method.name.equals("actuallyHurt") || method.name.equals("m_6475_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new VarInsnNode(Opcodes.FLOAD, 2));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleForceActuallyHurt",
-                            "(Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/damagesource/DamageSource;F)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 3);
-                    modified = true;
-                }
-                if ((method.name.equals("setHealth") || method.name.equals("m_21153_")) &&
-                        method.desc.equals("(F)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.FLOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "handleSetHealth",
-                            "(Lnet/minecraft/world/entity/LivingEntity;F)F",
-                            false
-                    ));
-                    insnList.add(new VarInsnNode(Opcodes.FSTORE, 1));
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-            }
-        }
-        if (classNode.name.equals("net/minecraft/server/players/PlayerList")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.name.equals("respawn") || method.name.equals("m_11236_")) &&
-                        method.desc.equals("(Lnet/minecraft/server/level/ServerPlayer;Z)Lnet/minecraft/server/level/ServerPlayer;")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "shouldPreventRespawn",
-                            "(Lnet/minecraft/world/entity/Entity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new InsnNode(Opcodes.ARETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-            }
-        }
-        if (classNode.name.equals("net/minecraft/server/level/ServerPlayer")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.name.equals("die") || method.name.equals("m_6667_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "shouldPreventServerPlayerDie",
-                            "(Lnet/minecraft/world/entity/Entity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 1);
-                    modified = true;
-                }
-                if ((method.name.equals("teleportTo") || method.name.equals("m_8999_")) &&
-                        method.desc.equals("(Lnet/minecraft/server/level/ServerLevel;DDDFF)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            ENTITY_METHODS,
-                            "shouldPreventTeleport",
-                            "(Lnet/minecraft/world/entity/Entity;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                }
-            }
-        }
-        if (classNode.name.equals("net/minecraft/network/syncher/SynchedEntityData")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.name.equals("set") || method.name.equals("m_135381_"))
-                        && method.desc.equals("(Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;)V")) {
-                    InsnList insnList = new InsnList();
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 2));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            "com/maxwell/hyperdamagelib/transformer/DecaySynchedEntityDataMethods",
-                            "handleForceSet",
-                            "(Lnet/minecraft/network/syncher/SynchedEntityData;Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;)Z",
-                            false
-                    ));
-                    LabelNode label = new LabelNode();
-                    insnList.add(new JumpInsnNode(Opcodes.IFEQ, label));
-                    insnList.add(new InsnNode(Opcodes.RETURN));
-                    insnList.add(label);
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 1));
-                    insnList.add(new VarInsnNode(Opcodes.ALOAD, 2));
-                    insnList.add(new MethodInsnNode(
-                            Opcodes.INVOKESTATIC,
-                            "com/maxwell/hyperdamagelib/transformer/DecaySynchedEntityDataMethods",
-                            "onSet",
-                            "(Lnet/minecraft/network/syncher/SynchedEntityData;Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;)Ljava/lang/Object;",
-                            false
-                    ));
-                    insnList.add(new VarInsnNode(Opcodes.ASTORE, 2));
-                    method.instructions.insertBefore(method.instructions.getFirst(), insnList);
-                    method.maxStack = Math.max(method.maxStack, 4);
-                    modified = true;
-                }
-            }
-            return modified;
-        }
-        boolean shouldWrapInsn = (phase == Phase.GetBytecode);
-        boolean shouldModifyReturn = (phase == Phase.GetBytecode);
+
+        boolean shouldWrapInsn = (phase == Phase.GetBytecode || phase == Phase.ILaunchPluginServiceBefore)
+                && exclusiveInstructionWrappingPackages.stream().noneMatch(packageName -> classNode.name.startsWith(packageName));
+        boolean shouldModifyReturn = (phase == Phase.GetBytecode || phase == Phase.ILaunchPluginService);
+
+        // 1. 各メソッド内のCall-site（呼び出し元）の書き換え
         for (MethodNode method : classNode.methods) {
-            for (AbstractInsnNode insn : method.instructions) {
-                if (insn instanceof MethodInsnNode methodInsn) {
-                    if ((insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKEINTERFACE) && shouldWrapInsn) {
-                        if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
-                            method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
-                            InsnList insnList = new InsnList();
-                            insnList.add(new InsnNode(Opcodes.SWAP));
-                            insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getMaxHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
-                            method.instructions.insert(methodInsn, insnList);
-                            method.maxStack += 1;
-                            modified = true;
-                        }
+            for (AbstractInsnNode insn : method.instructions.toArray()) {
+                if (insn instanceof MethodInsnNode methodInsn && shouldWrapInsn) {
+                    if (insn.getOpcode() == Opcodes.INVOKEVIRTUAL || insn.getOpcode() == Opcodes.INVOKEINTERFACE) {
                         if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                             method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
                             InsnList insnList = new InsnList();
@@ -420,7 +61,6 @@ public class DecayGenericTransformer {
                             method.instructions.insert(methodInsn, insnList);
                             method.maxStack += 1;
                             modified = true;
-
                         } else if (isSameMethod(methodInsn.owner, methodInsn, "net/minecraft/world/entity/LivingEntity", "m_21224_", "isDeadOrDying", "()Z", false)) {
                             method.instructions.insertBefore(methodInsn, new InsnNode(Opcodes.DUP));
                             InsnList insnList = new InsnList();
@@ -472,7 +112,6 @@ public class DecayGenericTransformer {
                             method.maxStack += 1;
                             modified = true;
                         }
-
                     }
                 } else if (shouldModifyReturn) {
                     if (insn.getOpcode() == Opcodes.FRETURN) {
@@ -480,14 +119,6 @@ public class DecayGenericTransformer {
                             InsnList insnList = new InsnList();
                             insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
                             insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
-                            method.instructions.insertBefore(insn, insnList);
-                            method.maxStack += 1;
-                            modified = true;
-                        }
-                        if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
-                            InsnList insnList = new InsnList();
-                            insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                            insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "getMaxHealth", "(FLnet/minecraft/world/entity/LivingEntity;)F", false));
                             method.instructions.insertBefore(insn, insnList);
                             method.maxStack += 1;
                             modified = true;
@@ -527,15 +158,9 @@ public class DecayGenericTransformer {
                     }
                 }
             }
+
+            // 2. メソッド先頭への門番（injectHead）注入
             if (shouldModifyReturn) {
-                if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21233_", "getMaxHealth", "()F", false)) {
-                    injectHead(method,
-                            new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", false),
-                            new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "replaceGetMaxHealth", "(Lnet/minecraft/world/entity/LivingEntity;)F", false),
-                            new InsnNode(Opcodes.FRETURN));
-                    method.maxStack += 1;
-                    modified = true;
-                }
                 if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                     injectHead(method,
                             new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", false),
@@ -565,15 +190,6 @@ public class DecayGenericTransformer {
                     method.maxStack += 1;
                     modified = true;
                 }
-            }
-            if (!tickInjected && phase == Phase.GetBytecode && isSameMethod(classNode.name, method, "net/minecraft/server/level/ServerLevel", "m_8793_", "tick", "(Ljava/util/function/BooleanSupplier;)V", false)) {
-                InsnList insnList = new InsnList();
-                insnList.add(new VarInsnNode(Opcodes.ALOAD, 0));
-                insnList.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "updateLastTicks", "(Lnet/minecraft/server/level/ServerLevel;)V", false));
-                method.instructions.insert(insnList);
-                method.maxStack += 1;
-                tickInjected = true;
-                modified = true;
             }
         }
         return modified;
@@ -607,28 +223,40 @@ public class DecayGenericTransformer {
         return isSubclass(owner, superClass, isInterface);
     }
 
-    public static void registerClassHierarchy(String className, String superName) {
-        if (className != null && superName != null) {
-            SUPER_CLASS_MAP.put(className.replace('.', '/'), superName.replace('.', '/'));
-        }
-    }
+    public static boolean isSubclass(String className, String superClass, boolean isInterface) {
+        if (className == null || superClass == null) return false;
+        if (className.equals(superClass) || superClass.equals("java/lang/Object")) return true;
+        if (className.equals("java/lang/Object")) return false;
 
-    public static boolean isSubclass(String className, String targetSuperClass, boolean isInterface) {
-        if (className == null || targetSuperClass == null) return false;
-        String current = className.replace('.', '/');
-        String target = targetSuperClass.replace('.', '/');
-        if (current.equals(target) || target.equals("java/lang/Object")) return true;
-        int maxDepth = 100;
-        while (current != null && !current.equals("java/lang/Object") && maxDepth-- > 0) {
-            current = SUPER_CLASS_MAP.get(current);
-            if (target.equals(current)) {
-                return true;
+        String currentName = className.replace('.', '/');
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) classLoader = DecayGenericTransformer.class.getClassLoader();
+
+        int maxDepth = 30;
+        while (currentName != null && !currentName.equals("java/lang/Object") && maxDepth-- > 0) {
+            try (InputStream is = classLoader.getResourceAsStream(currentName.concat(".class"))) {
+                if (is == null) return false;
+                ClassReader classReader = new ClassReader(is);
+                currentName = classReader.getSuperName();
+                ClassNode classNode = new ClassNode(Opcodes.ASM9);
+                classReader.accept(classNode, ClassReader.SKIP_CODE);
+                if (classNode.visibleAnnotations != null && classNode.visibleAnnotations.stream().anyMatch(annotationNode -> annotationNode.desc.equals(ONLYIN_DESC) && !((String[]) annotationNode.values.get(annotationNode.values.indexOf("value") + 1))[1].equals(FML_DIST))) {
+                    return false;
+                }
+                if (currentName != null && currentName.equals(superClass)) {
+                    return true;
+                }
+                if (isInterface) {
+                    for (String interfaceName : classReader.getInterfaces()) {
+                        if (isSubclass(interfaceName, superClass, true)) {
+                            return true;
+                        }
+                    }
+                }
+            } catch (Throwable e) {
+                return false;
             }
         }
         return false;
-    }
-
-    public enum Phase {
-        GetBytecode, ILaunchPluginServiceBefore, ILaunchPluginService
     }
 }

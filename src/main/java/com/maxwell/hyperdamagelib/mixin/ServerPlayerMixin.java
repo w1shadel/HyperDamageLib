@@ -4,26 +4,21 @@ import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ServerPlayer.class)
+@Mixin(value = ServerPlayer.class, priority = -10000000)
 public abstract class ServerPlayerMixin {
-    @Unique
-    private boolean decay$isLoginIncomplete() {
-        ServerPlayer player = (ServerPlayer) (Object) this;
-        return player.connection == null;
-    }
-
     @Inject(method = "die", at = @At("HEAD"), cancellable = true)
     private void decay$preventServerPlayerDie(DamageSource source, CallbackInfo ci) {
-        if (decay$isLoginIncomplete()) {
+        ServerPlayer player = (ServerPlayer) (Object) this;
+        if (player.connection == null) {
             ci.cancel();
             return;
         }
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
+            // NoSugar等の直接 die() 呼び出しを完全に無効化
             ci.cancel();
         }
     }

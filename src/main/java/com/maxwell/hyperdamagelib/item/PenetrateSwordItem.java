@@ -14,10 +14,8 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
@@ -27,50 +25,30 @@ public class PenetrateSwordItem extends SwordItem {
     }
 
     @Override
-    public boolean onEntitySwing(ItemStack stack, LivingEntity attacker) {
-        Level level = attacker.level();
-        if (level.isClientSide()) {
-            level.playSound(attacker, attacker.blockPosition(), SoundEvents.PLAYER_ATTACK_SWEEP, SoundSource.PLAYERS, 0.5F, 1.4F);
+    public boolean hurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
+        if (!attacker.level().isClientSide()) {
+            DamageSource source = DecayDamageUtil.getPenetrateSource(attacker.level(), attacker);
+            DecayDamageUtil.applyCustomDamage(target, source, 18.0F);
         }
-        return false;
+        return true;
     }
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide()) {
-            double aoeRange = 4.5D;
-            AABB searchBox = player.getBoundingBox().inflate(aoeRange);
-            List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, searchBox,
-                    entity -> entity != player && entity.isAlive() && !entity.isSpectator()
-            );
-            String customMessage = "%victim%'s stance was completely shattered by %attacker%'s Force Burst!";
-            DamageSource penetrateSource = DecayDamageUtil.getPenetrateSource(level, player, customMessage);
-            boolean hitAny = false;
-            for (LivingEntity target : targets) {
-                target.hurt(penetrateSource, 12.0F);
-                if (level instanceof ServerLevel serverLevel) {
-                    serverLevel.sendParticles(ParticleTypes.FLASH, target.getX(), target.getY() + (target.getBbHeight() / 2.0F), target.getZ(), 2, 0.1D, 0.1D, 0.1D, 0.0D);
-                }
-                hitAny = true;
-            }
-            if (hitAny) {
-                player.displayClientMessage(Component.translatable("message.hyperdamagelib.penetrate.wave_hit"), true);
-                level.playSound(null, player.blockPosition(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.8F, 1.3F);
-            } else {
-                player.displayClientMessage(Component.translatable("message.hyperdamagelib.penetrate.wave_miss"), true);
-                level.playSound(null, player.blockPosition(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.5F, 1.2F);
-            }
-            player.getCooldowns().addCooldown(this, 50);
-        }
-        return InteractionResultHolder.success(stack);
-    }
+            AABB aoe = player.getBoundingBox().inflate(5.0D);
+            List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, aoe, e -> e != player && e.isAlive());
+            DamageSource source = DecayDamageUtil.getPenetrateSource(level, player);
 
-    @Override
-    public void appendHoverText(ItemStack stack, @Nullable Level level, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.hyperdamagelib.penetrate_sword.tooltip_1"));
-        tooltip.add(Component.translatable("item.hyperdamagelib.penetrate_sword.tooltip_2"));
-        tooltip.add(Component.translatable("item.hyperdamagelib.penetrate_sword.tooltip_3"));
-        super.appendHoverText(stack, level, tooltip, flag);
+            for (LivingEntity target : targets) {
+                DecayDamageUtil.applyCustomDamage(target, source, 15.0F);
+                if (level instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(ParticleTypes.FLASH, target.getX(), target.getY() + 1.0, target.getZ(), 2, 0.1, 0.1, 0.1, 0.0);
+                }
+            }
+            level.playSound(null, player.blockPosition(), SoundEvents.TRIDENT_THROW, SoundSource.PLAYERS, 0.8F, 1.4F);
+            player.getCooldowns().addCooldown(this, 40);
+        }
+        return InteractionResultHolder.success(player.getItemInHand(hand));
     }
 }

@@ -113,9 +113,6 @@ public class MeasurementDummyEntity extends Mob implements IDecayEntity {
         if (!this.level().isClientSide()) {
             this.dead = false;
             this.deathTime = 0;
-            if (!this.isRemoveBypass()) {
-                this.removalReason = null;
-            }
         }
         super.tick();
         if (!this.level().isClientSide()) {
@@ -302,13 +299,6 @@ public class MeasurementDummyEntity extends Mob implements IDecayEntity {
         if (this.isRemoveBypass()) {
             super.onRemovedFromWorld();
             return;
-        }
-        if (!this.level().isClientSide() && this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            this.removalReason = null;
-            serverLevel.getServer().tell(new net.minecraft.server.TickTask(0, () -> {
-                this.removalReason = null;
-                serverLevel.addFreshEntity(this);
-            }));
         }
     }
 
