@@ -62,7 +62,7 @@ public class DecayEventHandler {
                             com.maxwell.hyperdamagelib.init.ModEffects.HEALING_SICKNESS.get(), 160, nextAmp
                     );
                     sicknessInstance.setCurativeItems(java.util.List.of());
-//                    DecayDamageUtil.forceAddEffect(victim, sicknessInstance, livingAttacker);
+
                 }
             }
         }

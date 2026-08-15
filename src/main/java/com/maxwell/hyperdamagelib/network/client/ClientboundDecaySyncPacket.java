@@ -71,7 +71,6 @@ public class ClientboundDecaySyncPacket {
                 decay.setSuperInvincible(this.superInvincible);
                 decay.setHealBlocked(this.healBlocked);
 
-                // クライアント側のUUIDセットも同期
                 InvincibleHelper.setInvincible(entity, this.superInvincible);
 
                 if (this.superInvincible && entity instanceof LivingEntity living) {

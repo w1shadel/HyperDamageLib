@@ -68,20 +68,16 @@ public final class DecayDamageUtil {
         return Component.literal(template.replace("%victim%", victimName).replace("%attacker%", attackerName));
     }
 
-    // ★ ダメージ適用のコアメソッド
     public static void applyCustomDamage(LivingEntity target, DamageSource source, float rawAmount) {
         if (target.level().isClientSide()) return;
 
-        // ダミー人形の場合は測定記録
         if (target instanceof MeasurementDummyEntity dummy) {
             dummy.recordDamageAbsolute(source, rawAmount);
             return;
         }
 
-        // 自Modの無敵モードなら完全に無効化
         if (InvincibleHelper.isInvincible(target)) return;
 
-        // 【異常値チェック】攻撃力・ターゲットHPが非数または無限大の場合 -> 即座に強制抹消
         float targetMaxHp = (float) target.getAttributeValue(Attributes.MAX_HEALTH);
         if (Float.isNaN(rawAmount) || Float.isInfinite(rawAmount) ||
                 Float.isNaN(targetMaxHp) || Float.isInfinite(targetMaxHp) || targetMaxHp > 1000000.0F) {
@@ -96,11 +92,10 @@ public final class DecayDamageUtil {
 
         float finalDamage = rawAmount;
 
-        // ==========================================
-        // 1. Penetrate の計算（バニラ要素を考慮＋異常装甲の即死化）
-        // ==========================================
+
+
         if (isPenetrate) {
-            // 無敵時間 (i-frame) のチェック
+
             int invulnerableTime = entAcc.getInvulnerableTime();
             float lastHurt = livAcc.getLastHurt();
             if (invulnerableTime > 10) {
@@ -108,7 +103,7 @@ public final class DecayDamageUtil {
                     finalDamage = rawAmount - lastHurt;
                     livAcc.setLastHurt(rawAmount);
                 } else {
-                    return; // i-frame中の低いダメージは通さない
+                    return; 
                 }
             } else {
                 livAcc.setLastHurt(rawAmount);
@@ -116,37 +111,33 @@ public final class DecayDamageUtil {
                 target.hurtTime = 10;
             }
 
-            // 防御力・タフネスの取得
             float armor = (float) target.getArmorValue();
             float toughness = (float) target.getAttributeValue(Attributes.ARMOR_TOUGHNESS);
 
-            // 【チート防御判定】NoSugar等の19億アーマーや非数を検知したら強制即死
             if (Float.isNaN(armor) || Float.isInfinite(armor) || armor > 1000.0F ||
                     Float.isNaN(toughness) || Float.isInfinite(toughness) || toughness > 1000.0F) {
                 DecayForceKillHelper.decayForceKill(target);
                 return;
             }
 
-            // バニラ防御力計算
             finalDamage = CombatRules.getDamageAfterAbsorb(finalDamage, armor, toughness);
 
-            // 耐性ポーションの計算
             if (target.hasEffect(MobEffects.DAMAGE_RESISTANCE)) {
                 int amp = target.getEffect(MobEffects.DAMAGE_RESISTANCE).getAmplifier();
                 if (amp >= 4) {
-                    // 耐性5以上（100%カット）の不死化Modは貫通フェイルセーフで即死
+
                     DecayForceKillHelper.decayForceKill(target);
                     return;
                 }
                 finalDamage *= Math.max(0.1F, 1.0F - (amp + 1) * 0.20F);
             }
         }
-        // ==========================================
-        // 2. Erosion の計算（防御無視・最大HP削り）
-        // ==========================================
+
+
+
         else if (isErosion) {
             finalDamage = rawAmount;
-            // 侵食ゲージ（最大HPの削り）を蓄積
+
             if (target instanceof IDecayEntity decayTarget) {
                 decayTarget.addDecayAmount(finalDamage);
             }
@@ -154,9 +145,8 @@ public final class DecayDamageUtil {
 
         if (finalDamage <= 0.0F || Float.isNaN(finalDamage)) return;
 
-        // ==========================================
-        // 3. 実HPへの強制適用（NoSugar等の0化を突破）
-        // ==========================================
+
+
         try {
             BYPASS_DECAY.set(true);
             float currentHealth = target.getEntityData().get(LivingEntityAccessor.getDataHealthId());
@@ -169,7 +159,6 @@ public final class DecayDamageUtil {
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
 
-            // 死亡判定
             if (nextHealth <= 0.0F || target.isDeadOrDying()) {
                 boolean hasTotem = false;
                 try {

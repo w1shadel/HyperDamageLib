@@ -33,12 +33,11 @@ public final class DecayBootstrap {
             STARTED = true;
         }
         try {
-            // 1. ModLauncher への LaunchPlugin 直接注入（Mixin適用後のコードを捕まえる最重要フック）
+
             if (!LAUNCH_PLUGIN_AVAILABLE) {
                 LAUNCH_PLUGIN_AVAILABLE = initLaunchPlugin();
             }
 
-            // 2. エージェントの起動とクラスローダーのフック
             if (instrumentation == null) {
                 ByteBuddyAgent.install();
                 instrumentation = ByteBuddyAgent.getInstrumentation();
@@ -52,7 +51,6 @@ public final class DecayBootstrap {
                     Class<?> classLoaderClass = Class.forName("cpw.mods.cl.ModuleClassLoader");
                     instrumentation.retransformClasses(classLoaderClass);
 
-                    // 3. ネイティブトランスフォーマーの追加
                     instrumentation.addTransformer(new GenericClassFileTransformer(), true);
                     HDL.LOGGER.info("[HDL] Triple-layer bytecode transformation pipeline active.");
                 }

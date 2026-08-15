@@ -27,15 +27,12 @@ public class DecayForceKillHelper {
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
 
-        // 1. AI破壊
         breakBrain(entity);
 
-        // 2. 最大HP分のDecay（侵食）を付与して死亡フラグ確立
         if (entity instanceof IDecayEntity decay) {
             decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
         }
 
-        // 3. HPを強制0化
         try {
             DecayDamageUtil.BYPASS_DECAY.set(true);
             entity.setHealth(0.0F);
@@ -44,12 +41,10 @@ public class DecayForceKillHelper {
             DecayDamageUtil.BYPASS_DECAY.remove();
         }
 
-        // 4. 死亡処理
         DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
         entity.die(erosion);
         dropAllForce(entity);
 
-        // 5. プレイヤー以外はワールドマネージャーから完全抹消
         if (!(entity instanceof Player)) {
             if (entity instanceof IDecayEntity decay) {
                 decay.setRemoveBypass(true);
@@ -144,7 +139,6 @@ public class DecayForceKillHelper {
                 manager.entityGetter = new LevelEntityGetterAdapter<>(newEntityLookup, sectionStorage);
             }
 
-            // EntityTickList からの削除
             serverLevel.entityTickList.remove(victim);
             serverLevel.entityTickList.active.remove(victim.getId());
             serverLevel.entityTickList.passive.remove(victim.getId());

@@ -18,7 +18,7 @@ public abstract class ServerPlayerMixin {
             return;
         }
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-            // NoSugar等の直接 die() 呼び出しを完全に無効化
+
             ci.cancel();
         }
     }

@@ -140,7 +140,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         this.superInvincible = val;
         self.setInvulnerable(val);
 
-        // ★ トランスフォーマー用のUUIDセットと完全に連動させる！
         InvincibleHelper.setInvincible(self, val);
 
         float currentRealHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());

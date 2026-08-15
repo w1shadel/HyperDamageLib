@@ -48,7 +48,6 @@ public class DecayGenericTransformer {
                 && exclusiveInstructionWrappingPackages.stream().noneMatch(packageName -> classNode.name.startsWith(packageName));
         boolean shouldModifyReturn = (phase == Phase.GetBytecode || phase == Phase.ILaunchPluginService);
 
-        // 1. 各メソッド内のCall-site（呼び出し元）の書き換え
         for (MethodNode method : classNode.methods) {
             for (AbstractInsnNode insn : method.instructions.toArray()) {
                 if (insn instanceof MethodInsnNode methodInsn && shouldWrapInsn) {
@@ -159,7 +158,6 @@ public class DecayGenericTransformer {
                 }
             }
 
-            // 2. メソッド先頭への門番（injectHead）注入
             if (shouldModifyReturn) {
                 if (isSameMethod(classNode.name, method, "net/minecraft/world/entity/LivingEntity", "m_21223_", "getHealth", "()F", false)) {
                     injectHead(method,

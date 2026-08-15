@@ -13,14 +13,12 @@ import java.util.function.Consumer;
 
 public class DecayEntityMethods {
 
-    // 門番（injectHead）を発動させるかどうかの判定
     public static boolean shouldReplaceHealthMethod(Entity entity) {
         if (DecayDamageUtil.BYPASS_DECAY.get()) return false;
         if (entity instanceof MeasurementDummyEntity) return true;
         return InvincibleHelper.isInvincible(entity);
     }
 
-    // 門番が発動した時だけの即時return値（絶対に livingEntity.getHealth() を呼んではいけない！）
     public static float replaceGetHealth(LivingEntity livingEntity) {
         if (livingEntity instanceof MeasurementDummyEntity dummy) {
             return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
@@ -31,7 +29,7 @@ public class DecayEntityMethods {
             );
             return Float.isNaN(maxHealth) || maxHealth < 20.0F ? 20.0F : maxHealth;
         }
-        // 再帰呼び出しを完全回避するため、SynchedEntityData から直接生値を取得する
+
         try {
             Float rawHealth = livingEntity.getEntityData().get(LivingEntityAccessor.getDataHealthId());
             return rawHealth != null ? rawHealth : 20.0F;

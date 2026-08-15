@@ -15,7 +15,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(Entity.class)
 public abstract class EntityMixin {
 
-    // 攻撃のクリック・Raycastターゲットから完全に消滅する
     @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
     private void decay$isPickable(CallbackInfoReturnable<Boolean> cir) {
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
@@ -41,7 +40,7 @@ public abstract class EntityMixin {
             }
         }
     }
-    // 攻撃可能判定を無効化
+
     @Inject(method = "isAttackable", at = @At("HEAD"), cancellable = true)
     private void decay$isAttackable(CallbackInfoReturnable<Boolean> cir) {
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
@@ -50,7 +49,6 @@ public abstract class EntityMixin {
         }
     }
 
-    // 飛び道具（SugarBow等）の当たり判定をすり抜けさせる
     @Inject(method = "canBeHitByProjectile", at = @At("HEAD"), cancellable = true)
     private void decay$canBeHitByProjectile(CallbackInfoReturnable<Boolean> cir) {
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {

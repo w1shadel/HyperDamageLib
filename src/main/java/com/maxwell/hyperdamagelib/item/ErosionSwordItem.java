@@ -64,7 +64,7 @@ public class ErosionSwordItem extends SwordItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         if (!level.isClientSide()) {
             if (player.isShiftKeyDown()) {
-                // 超無敵モードの切り替え
+
                 boolean nextState = !InvincibleHelper.isInvincible(player);
                 InvincibleHelper.setInvincible(player, nextState);
                 if (player instanceof IDecayEntity decay) {
@@ -76,7 +76,7 @@ public class ErosionSwordItem extends SwordItem {
                 );
                 level.playSound(null, player.blockPosition(), nextState ? SoundEvents.BEACON_ACTIVATE : SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
             } else {
-                // 侵食衝撃波（全方位・最大HP破壊）
+
                 DamageSource source = DecayDamageUtil.getErosionSource(level, player);
                 AABB aoe = player.getBoundingBox().inflate(6.0D);
                 List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, aoe, e -> e != player && e.isAlive());

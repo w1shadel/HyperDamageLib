@@ -14,8 +14,8 @@ public class ForgeHooksMixin {
     @Inject(method = "onLivingDeath", at = @At("HEAD"), cancellable = true)
     private static void onLivingDeathMixin(LivingEntity entity, DamageSource src, CallbackInfoReturnable<Boolean> cir) {
         if (InvincibleHelper.isInvincible(entity)) {
-            // true を返すと Forge は「イベントがキャンセルされた」と判定し、
-            // バニラ ServerPlayer.die() の先頭にある if (onLivingDeath) return; で即座に終了する
+
+
             cir.setReturnValue(true);
             cir.cancel();
         }
@@ -24,7 +24,7 @@ public class ForgeHooksMixin {
     @Inject(method = "onLivingAttack", at = @At("HEAD"), cancellable = true)
     private static void onLivingAttackMixin(LivingEntity entity, DamageSource src, float amount, CallbackInfoReturnable<Boolean> cir) {
         if (InvincibleHelper.isInvincible(entity)) {
-            // false を返すとバニラ LivingEntity.hurt() は1行目で何もせず return false する
+
             cir.setReturnValue(false);
             cir.cancel();
         }
