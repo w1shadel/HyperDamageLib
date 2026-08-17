@@ -17,22 +17,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.*;
-import net.minecraft.world.phys.Vec3;
 
-import java.util.List;
 import java.util.Objects;
 
 public class DecayForceKillHelper {
-
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
-
         breakBrain(entity);
-
         if (entity instanceof IDecayEntity decay) {
             decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
         }
-
         try {
             DecayDamageUtil.BYPASS_DECAY.set(true);
             entity.setHealth(0.0F);
@@ -40,11 +34,9 @@ public class DecayForceKillHelper {
         } finally {
             DecayDamageUtil.BYPASS_DECAY.remove();
         }
-
         DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
         entity.die(erosion);
         dropAllForce(entity);
-
         if (!(entity instanceof Player)) {
             if (entity instanceof IDecayEntity decay) {
                 decay.setRemoveBypass(true);
@@ -77,7 +69,8 @@ public class DecayForceKillHelper {
                 breakGoalSelector(mob.targetSelector);
                 mob.setTarget(null);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void breakGoalSelector(GoalSelector goalSelector) {
@@ -85,9 +78,12 @@ public class DecayForceKillHelper {
             goalSelector.removeAllGoals(goal -> true);
             goalSelector.addGoal(0, new Goal() {
                 @Override
-                public boolean canUse() { return false; }
+                public boolean canUse() {
+                    return false;
+                }
             });
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void dropAllForce(LivingEntity livingEntity) {
@@ -114,7 +110,6 @@ public class DecayForceKillHelper {
         if (level instanceof ServerLevel serverLevel) {
             victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
             victim.levelCallback = EntityInLevelCallback.NULL;
-
             PersistentEntitySectionManager<Entity> manager = serverLevel.entityManager;
             EntitySectionStorage<Entity> sectionStorage = manager.sectionStorage;
             if (manager.isLoaded(victim.getUUID())) {
@@ -127,7 +122,6 @@ public class DecayForceKillHelper {
                 }
                 manager.knownUuids.remove(victim.getUUID());
             }
-
             EntityLookup<Entity> entityLookup = manager.visibleEntityStorage;
             entityLookup.remove(victim);
             if (entityLookup.getEntity(victim.getId()) != null) {
@@ -138,14 +132,12 @@ public class DecayForceKillHelper {
                 manager.visibleEntityStorage = newEntityLookup;
                 manager.entityGetter = new LevelEntityGetterAdapter<>(newEntityLookup, sectionStorage);
             }
-
             serverLevel.entityTickList.remove(victim);
             serverLevel.entityTickList.active.remove(victim.getId());
             serverLevel.entityTickList.passive.remove(victim.getId());
             if (serverLevel.entityTickList.iterated != null) {
                 serverLevel.entityTickList.iterated.remove(victim.getId());
             }
-
             serverLevel.getChunkSource().removeEntity(victim);
         }
     }

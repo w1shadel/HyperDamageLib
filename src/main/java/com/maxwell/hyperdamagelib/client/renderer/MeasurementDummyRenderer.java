@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.HumanoidMobRenderer;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.resources.ResourceLocation;
-
+@SuppressWarnings("removal")
 public class MeasurementDummyRenderer extends HumanoidMobRenderer<MeasurementDummyEntity, HumanoidModel<MeasurementDummyEntity>> {
     private static final ResourceLocation TEXTURE = new ResourceLocation("textures/entity/player/wide/steve.png");
 

@@ -33,6 +33,11 @@ public class ModMessages {
                 .decoder(ClientboundDecayEffectPacket::decode)
                 .consumerMainThread(ClientboundDecayEffectPacket::handle)
                 .add();
+        INSTANCE.messageBuilder(com.maxwell.hyperdamagelib.network.client.ServerboundDecaySwingPacket.class, id())
+                .encoder(com.maxwell.hyperdamagelib.network.client.ServerboundDecaySwingPacket::encode)
+                .decoder(com.maxwell.hyperdamagelib.network.client.ServerboundDecaySwingPacket::decode)
+                .consumerMainThread(com.maxwell.hyperdamagelib.network.client.ServerboundDecaySwingPacket::handle)
+                .add();
     }
 
     public static <MSG> void sendToClients(MSG message) {

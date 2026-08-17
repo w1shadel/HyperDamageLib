@@ -16,7 +16,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-
+@SuppressWarnings("removal")
 @Mod.EventBusSubscriber(modid = HDL.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayProgClientEventHandler {
     private static final ResourceLocation DECAY_SHADER = new ResourceLocation(HDL.MODID, "shaders/post/decay.json");

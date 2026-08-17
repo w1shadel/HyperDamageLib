@@ -1,14 +1,9 @@
 package com.maxwell.hyperdamagelib.mixin;
 
-import com.maxwell.hyperdamagelib.init.ModDamageTypes;
-import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
-import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
@@ -17,7 +12,6 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
@@ -30,8 +24,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @Unique
     private float decayAmount = 0.0f;
     @Unique
-    private boolean decayDeathTriggered = false;
-    @Unique
     private boolean superInvincible = false;
     @Unique
     private boolean decayRemoveBypass = false;
@@ -43,24 +35,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private float invincibleHealthValue = 20.0f;
     @Unique
     private boolean healBlocked = false;
-
-    @Unique
-    private boolean decay$isLoginIncomplete() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (self instanceof ServerPlayer player) {
-            return player.connection == null;
-        }
-        return self.tickCount <= 0;
-    }
-
-    @Unique
-    private float decay$getTargetInvincibleHealth() {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (this.keepCurrentHealth) {
-            return this.invincibleHealthValue;
-        }
-        return self.getMaxHealth();
-    }
 
     @Override
     public int getDecayHoldTicks() {
@@ -80,36 +54,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @Override
     public void setDecayAmount(float amount) {
         LivingEntity self = (LivingEntity) (Object) this;
-        float originalMax = (float) self.getAttributeValue(
-                net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH
-        );
-        if (Float.isNaN(originalMax)) {
-            originalMax = 20.0F;
-        } else if (Float.isInfinite(originalMax)) {
-            originalMax = 1000000.0F;
-        }
-        if (Float.isNaN(amount)) {
-            amount = 0.0F;
-        } else if (Float.isInfinite(amount)) {
-            amount = originalMax;
-        }
+        float originalMax = (float) self.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
+        if (Float.isNaN(originalMax) || originalMax <= 0.0F) originalMax = 20.0F;
         this.decayAmount = Math.max(0.0f, Math.min(amount, originalMax));
-        float cappedMax = originalMax - getDecayAmount();
-        if (Float.isNaN(cappedMax) || cappedMax < 0.0F) {
-            cappedMax = 0.0F;
-        }
-        float realHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-        if (Float.isNaN(realHealth)) {
-            realHealth = 0.0F;
-        }
-        if (realHealth > cappedMax || Float.isInfinite(realHealth)) {
-            try {
-                DecayDamageUtil.BYPASS_DECAY.set(true);
-                self.setHealth(cappedMax);
-            } finally {
-                DecayDamageUtil.BYPASS_DECAY.remove();
-            }
-        }
         decay$syncToTracking();
     }
 
@@ -140,17 +87,20 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         LivingEntity self = (LivingEntity) (Object) this;
         this.superInvincible = val;
         self.setInvulnerable(val);
-
         InvincibleHelper.setInvincible(self, val);
-
-        float currentRealHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
         if (val) {
+            this.dead = false;
+            this.deathTime = 0;
+            self.setPose(Pose.STANDING);
             if (this.keepCurrentHealth) {
-                this.invincibleHealthValue = Math.max(1.0f, Math.min(currentRealHealth, self.getMaxHealth()));
+                this.invincibleHealthValue = Math.max(1.0f, Math.min(self.getHealth(), self.getMaxHealth()));
             } else {
                 this.invincibleHealthValue = self.getMaxHealth();
             }
             self.setHealth(this.invincibleHealthValue);
+        } else {
+            this.dead = false;
+            this.deathTime = 0;
         }
         decay$syncToTracking();
     }
@@ -185,14 +135,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         this.decayRemoveBypass = val;
     }
 
-    @Override
-    public void subtractTrueHP(float amount) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (this.superInvincible) return;
-        DamageSource erosionSource = DecayDamageUtil.getErosionSource(self.level(), null);
-        self.hurt(erosionSource, amount);
-    }
-
     @Unique
     private void decay$syncToTracking() {
         LivingEntity self = (LivingEntity) (Object) this;
@@ -204,196 +146,38 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
     }
 
-    @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
-    private void decay$preventHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "hurt", at = @At("HEAD"))
+    private void decay$trackHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         LivingEntity self = (LivingEntity) (Object) this;
+        com.maxwell.hyperdamagelib.util.DecayDeathTracker.logHurt(self, source, amount, this.superInvincible);
+    }
 
-        if (InvincibleHelper.isInvincible(self)) {
-            cir.setReturnValue(false);
-            cir.cancel();
-            return;
-        }
-
-        if (source.is(ModDamageTypes.EROSION) || source.is(ModDamageTypes.PENETRATE)) {
-            if (!DecayDamageUtil.BYPASS_DECAY.get()) {
-                boolean result = DecayDamageUtil.applyCustomDamage(self, source, amount);
-                cir.setReturnValue(result);
-                cir.cancel();
-            }
+    @Inject(method = "setHealth", at = @At("HEAD"))
+    private void decay$trackSetHealth(float health, CallbackInfo ci) {
+        LivingEntity self = (LivingEntity) (Object) this;
+        float currentHealth = self.getHealth();
+        if (health < currentHealth) {
+            com.maxwell.hyperdamagelib.util.DecayDeathTracker.logSetHealth(self, currentHealth, health, this.superInvincible);
         }
     }
 
-    @Inject(method = "die", at = @At("HEAD"), cancellable = true)
-    private void decay$preventDie(DamageSource source, CallbackInfo ci) {
-        if (decay$isLoginIncomplete()) {
-            ci.cancel();
-            return;
-        }
-        if (this.superInvincible) {
-            ci.cancel();
-        }
-    }
-
-    @ModifyVariable(method = "setHealth", at = @At("HEAD"), argsOnly = true)
-    private float decay$modifySetHealthArg(float value) {
-        if (Float.isNaN(value)) {
-            value = 0.0F;
-        }
-        if (value < 0.0F) {
-            value = 0.0F;
-        }
-        if (decay$isLoginIncomplete()) {
-            return value;
-        }
+    @Inject(method = "die", at = @At("HEAD"))
+    private void decay$trackDie(DamageSource source, CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (self instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
-            if (!dummy.isRemoveBypass()) {
-                return dummy.getMaxHealth();
-            }
-        }
-        if (this.superInvincible) {
-            if (com.maxwell.hyperdamagelib.util.DecayDamageUtil.FORCE_DAMAGE.get()) {
-                return value;
-            }
-            return decay$getTargetInvincibleHealth();
-        }
-        float currentHealth = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-        if (Float.isNaN(currentHealth)) currentHealth = 0.0F;
-        float maxHp = self.getMaxHealth();
-        if (Float.isNaN(maxHp) || Float.isInfinite(maxHp)) maxHp = 1000000.0F;
-        float cappedMax = Math.max(0.0f, maxHp - this.decayAmount);
-        if (this.decayHoldTicks > 0 || this.decayAmount > 0.0f) {
-            if (value > currentHealth) {
-                return Math.min(currentHealth, cappedMax);
-            }
-        }
-        return Math.min(value, cappedMax);
-    }
-
-    @Inject(method = "isAlive", at = @At("HEAD"), cancellable = true)
-    private void decay$adjustIsAlive(CallbackInfoReturnable<Boolean> cir) {
-        if (decay$isLoginIncomplete()) {
-            return;
-        }
-        if (this.superInvincible) {
-            cir.setReturnValue(true);
-            return;
-        }
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (this.decayAmount >= self.getMaxHealth()) {
-            cir.setReturnValue(false);
-        }
-    }
-
-    @Inject(method = "isDeadOrDying", at = @At("HEAD"), cancellable = true)
-    private void decay$adjustIsDeadOrDying(CallbackInfoReturnable<Boolean> cir) {
-        if (decay$isLoginIncomplete()) {
-            return;
-        }
-        if (this.superInvincible) {
-            cir.setReturnValue(false);
-            return;
-        }
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (this.decayAmount >= self.getMaxHealth()) {
-            cir.setReturnValue(true);
-        }
-    }
-
-    @Inject(method = "getHealth", at = @At("HEAD"), cancellable = true)
-    private void decay$adjustHealthReturn(CallbackInfoReturnable<Float> cir) {
-        if (decay$isLoginIncomplete()) {
-            return;
-        }
-        LivingEntity self = (LivingEntity) (Object) this;
-        if (this.superInvincible) {
-            cir.setReturnValue(decay$getTargetInvincibleHealth());
-            return;
-        }
-        if (this.decayAmount >= self.getMaxHealth()) {
-            cir.setReturnValue(-Float.MAX_VALUE);
-        } else if (this.decayAmount > 0.0f) {
-            float original = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-            float cappedMax = Math.max(0.0f, self.getMaxHealth() - this.decayAmount);
-            cir.setReturnValue(Math.min(original, cappedMax));
-        }
+        com.maxwell.hyperdamagelib.util.DecayDeathTracker.logDie(self, source, this.superInvincible);
     }
 
     @Inject(method = "baseTick", at = @At("HEAD"))
-    private void decay$tickDecayDeath(CallbackInfo ci) {
-        if (decay$isLoginIncomplete()) {
-            return;
-        }
+    private void decay$tickSafety(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
-        if (self instanceof com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity dummy) {
-            if (!dummy.isRemoveBypass()) {
-                this.dead = false;
-                this.deathTime = 0;
-                if (self.getPose() == Pose.DYING) {
-                    self.setPose(Pose.STANDING);
-                }
-                self.setHealth(self.getMaxHealth());
-            }
-        }
         if (this.superInvincible) {
             if (this.dead || this.deathTime > 0) {
                 this.dead = false;
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
-                self.setHealth(decay$getTargetInvincibleHealth());
+                self.setHealth(this.keepCurrentHealth ? this.invincibleHealthValue : self.getMaxHealth());
                 decay$syncToTracking();
-
-            } else {
-                self.setHealth(decay$getTargetInvincibleHealth());
             }
         }
-    }
-
-    @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
-    private void decay$saveDecay(CompoundTag nbt, CallbackInfo ci) {
-        nbt.putFloat("decay_amount", this.decayAmount);
-        nbt.putBoolean("super_invincible", this.superInvincible);
-        nbt.putBoolean("keep_current_health", this.keepCurrentHealth);
-        nbt.putFloat("invincible_health_value", this.invincibleHealthValue);
-        nbt.putBoolean("heal_blocked", this.healBlocked);
-    }
-
-    @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
-    private void decay$loadDecay(CompoundTag nbt, CallbackInfo ci) {
-        if (nbt.contains("decay_amount")) {
-            this.decayAmount = nbt.getFloat("decay_amount");
-        }
-        if (nbt.contains("super_invincible")) {
-            this.superInvincible = nbt.getBoolean("super_invincible");
-        }
-        if (nbt.contains("keep_current_health")) {
-            this.keepCurrentHealth = nbt.getBoolean("keep_current_health");
-        }
-        if (nbt.contains("invincible_health_value")) {
-            this.invincibleHealthValue = nbt.getFloat("invincible_health_value");
-        }
-        if (nbt.contains("heal_blocked")) {
-            this.healBlocked = nbt.getBoolean("heal_blocked");
-        }
-    }
-
-    @Inject(method = "dropAllDeathLoot", at = @At("HEAD"), cancellable = true)
-    private void decay$preventDropAllDeathLoot(DamageSource source, CallbackInfo ci) {
-        if (this.superInvincible) {
-            ci.cancel();
-        }
-    }
-
-    @Inject(method = "getMaxHealth", at = @At("RETURN"), cancellable = true)
-    private void decay$adjustMaxHealthReturn(CallbackInfoReturnable<Float> cir) {
-        if (decay$isLoginIncomplete()) {
-            return;
-        }
-        if (this.superInvincible) {
-            return;
-        }
-        float originalMax = cir.getReturnValue();
-        float cappedMax = Math.max(1.0f, originalMax - this.decayAmount);
-        cir.setReturnValue(cappedMax);
     }
 }

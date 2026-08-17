@@ -2,11 +2,16 @@ package com.maxwell.hyperdamagelib.mixin.accessor;
 
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
+
+import java.util.Map;
 
 @Mixin(LivingEntity.class)
 public interface LivingEntityAccessor {
@@ -14,6 +19,9 @@ public interface LivingEntityAccessor {
     static EntityDataAccessor<Float> getDataHealthId() {
         throw new AssertionError();
     }
+
+    @Accessor("activeEffects")
+    Map<MobEffect, MobEffectInstance> getActiveEffects();
 
     @Accessor("dead")
     boolean isDeadFlag();
@@ -24,17 +32,11 @@ public interface LivingEntityAccessor {
     @Invoker("dropAllDeathLoot")
     void invokeDropAllDeathLoot(DamageSource source);
 
-    @Invoker("getDamageAfterArmorAbsorb")
-    float invokeGetDamageAfterArmorAbsorb(DamageSource source, float amount);
-
-    @Invoker("getDamageAfterMagicAbsorb")
-    float invokeGetDamageAfterMagicAbsorb(DamageSource source, float amount);
-
     @Invoker("onEffectAdded")
-    void invokeOnEffectAdded(net.minecraft.world.effect.MobEffectInstance effectInstance, net.minecraft.world.entity.Entity entity);
+    void invokeOnEffectAdded(MobEffectInstance effectInstance, Entity entity);
 
     @Invoker("onEffectUpdated")
-    void invokeOnEffectUpdated(net.minecraft.world.effect.MobEffectInstance effectInstance, boolean forced, net.minecraft.world.entity.Entity entity);
+    void invokeOnEffectUpdated(MobEffectInstance effectInstance, boolean forced, Entity entity);
 
     @Accessor("lastHurt")
     float getLastHurt();

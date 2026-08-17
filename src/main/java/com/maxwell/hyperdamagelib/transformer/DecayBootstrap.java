@@ -4,27 +4,16 @@ import com.maxwell.hyperdamagelib.HDL;
 import cpw.mods.modlauncher.LaunchPluginHandler;
 import cpw.mods.modlauncher.Launcher;
 import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
-import net.bytebuddy.agent.ByteBuddyAgent;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.Optional;
-import java.util.function.BiFunction;
-import java.util.jar.JarFile;
-import java.util.stream.Stream;
 
 public final class DecayBootstrap {
-    private static final String BRIDGE_CLASS = "com.maxwell.hyperdamagelib.agent.DecayBytecodeBridge";
-    public static volatile Instrumentation instrumentation = null;
     public static volatile boolean LAUNCH_PLUGIN_AVAILABLE = false;
     private static volatile boolean STARTED = false;
 
-    private DecayBootstrap() {}
+    private DecayBootstrap() {
+    }
 
     public static void start() {
         if (STARTED) return;
@@ -33,28 +22,10 @@ public final class DecayBootstrap {
             STARTED = true;
         }
         try {
-
             if (!LAUNCH_PLUGIN_AVAILABLE) {
                 LAUNCH_PLUGIN_AVAILABLE = initLaunchPlugin();
             }
-
-            if (instrumentation == null) {
-                ByteBuddyAgent.install();
-                instrumentation = ByteBuddyAgent.getInstrumentation();
-                if (instrumentation != null) {
-                    File agentJar = extractAgentJar();
-                    JarFile jarFile = new JarFile(agentJar);
-                    instrumentation.appendToBootstrapClassLoaderSearch(jarFile);
-                    registerBridge();
-
-                    instrumentation.addTransformer(new DecayBytecodeGetterTransformer(), true);
-                    Class<?> classLoaderClass = Class.forName("cpw.mods.cl.ModuleClassLoader");
-                    instrumentation.retransformClasses(classLoaderClass);
-
-                    instrumentation.addTransformer(new GenericClassFileTransformer(), true);
-                    HDL.LOGGER.info("[HDL] Triple-layer bytecode transformation pipeline active.");
-                }
-            }
+            HDL.LOGGER.info("[HDL] ModLauncher transformation pipeline initialized (CF-Compliant).");
         } catch (Throwable t) {
             HDL.LOGGER.error("[HDL] Critical error during DecayBootstrap.start()", t);
         }
@@ -73,36 +44,7 @@ public final class DecayBootstrap {
             map.put(plugin.name(), plugin);
             return true;
         } catch (Throwable e) {
-            HDL.LOGGER.error("[HDL] Failed to inject LaunchPlugin", e);
-            return false;
-        }
-    }
-
-    private static File extractAgentJar() throws IOException {
-        String resourcePath = "/META-INF/jarjar/decay-agent.jar";
-        InputStream is = DecayBootstrap.class.getResourceAsStream(resourcePath);
-        if (is == null) throw new IOException("Agent JAR not found: " + resourcePath);
-        java.nio.file.Path tempPath = java.nio.file.Files.createTempFile("decay-agent-", ".jar");
-        File tempFile = tempPath.toFile();
-        tempFile.deleteOnExit();
-        try (FileOutputStream os = new FileOutputStream(tempFile)) {
-            is.transferTo(os);
-        }
-        return tempFile;
-    }
-
-    private static boolean registerBridge() {
-        try {
-            Class<?> bridgeCls = Class.forName(BRIDGE_CLASS, true, ClassLoader.getSystemClassLoader());
-            Field streamField = bridgeCls.getField("streamTransformer");
-            BiFunction<Stream<byte[]>, String, Stream<byte[]>> streamFn = DecayBytecodeGetterTransformer::transformStreamBytes;
-            streamField.set(null, streamFn);
-
-            Field optField = bridgeCls.getField("transformer");
-            BiFunction<Optional<byte[]>, String, Optional<byte[]>> optFn = DecayBytecodeGetterTransformer::transformOptionalBytes;
-            optField.set(null, optFn);
-            return true;
-        } catch (Throwable t) {
+            HDL.LOGGER.error("[HDL] Failed to inject DecayLaunchPlugin into ModLauncher", e);
             return false;
         }
     }

@@ -18,7 +18,6 @@ public abstract class ServerPlayerMixin {
             return;
         }
         if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-
             ci.cancel();
         }
     }

@@ -5,7 +5,6 @@ import com.maxwell.hyperdamagelib.init.ModEffects;
 import com.maxwell.hyperdamagelib.init.ModItems;
 import com.maxwell.hyperdamagelib.init.ModTabs;
 import com.maxwell.hyperdamagelib.network.ModMessages;
-import com.maxwell.hyperdamagelib.transformer.DecayBootstrap;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -14,7 +13,7 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+@SuppressWarnings("removal")
 @Mod(HDL.MODID)
 public class HDL {
     public static final String MODID = "hyperdamagelib";

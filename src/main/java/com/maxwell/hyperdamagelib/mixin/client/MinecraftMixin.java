@@ -1,6 +1,5 @@
 package com.maxwell.hyperdamagelib.mixin.client;
 
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.DeathScreen;

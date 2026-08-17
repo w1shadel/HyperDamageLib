@@ -15,6 +15,7 @@ public class HDLMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
+        DecayBootstrap.start();
     }
 
     @Override

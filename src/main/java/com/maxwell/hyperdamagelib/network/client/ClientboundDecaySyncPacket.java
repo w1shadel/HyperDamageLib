@@ -70,9 +70,7 @@ public class ClientboundDecaySyncPacket {
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
                 decay.setSuperInvincible(this.superInvincible);
                 decay.setHealBlocked(this.healBlocked);
-
                 InvincibleHelper.setInvincible(entity, this.superInvincible);
-
                 if (this.superInvincible && entity instanceof LivingEntity living) {
                     living.dead = false;
                     living.deathTime = 0;
