@@ -146,27 +146,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
     }
 
-    @Inject(method = "hurt", at = @At("HEAD"))
-    private void decay$trackHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        com.maxwell.hyperdamagelib.util.DecayDeathTracker.logHurt(self, source, amount, this.superInvincible);
-    }
-
-    @Inject(method = "setHealth", at = @At("HEAD"))
-    private void decay$trackSetHealth(float health, CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        float currentHealth = self.getHealth();
-        if (health < currentHealth) {
-            com.maxwell.hyperdamagelib.util.DecayDeathTracker.logSetHealth(self, currentHealth, health, this.superInvincible);
-        }
-    }
-
-    @Inject(method = "die", at = @At("HEAD"))
-    private void decay$trackDie(DamageSource source, CallbackInfo ci) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        com.maxwell.hyperdamagelib.util.DecayDeathTracker.logDie(self, source, this.superInvincible);
-    }
-
     @Inject(method = "baseTick", at = @At("HEAD"))
     private void decay$tickSafety(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
