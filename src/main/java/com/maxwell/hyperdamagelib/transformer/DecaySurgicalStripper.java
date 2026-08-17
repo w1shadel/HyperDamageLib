@@ -45,7 +45,6 @@ public class DecaySurgicalStripper {
             for (int k = 0; k < 6; k++) {
                 method.instructions.remove(postNodes.get(k));
             }
-            HDL.LOGGER.info("[HDL-DEBUG] Surgically STRIPPED NoSugar hook at {}.{} around {}", className, method.name, callInsn.name);
             cleaned = true;
         } else if (postNodes.size() >= 2 &&
                 postNodes.get(0).getOpcode() == Opcodes.SWAP &&
@@ -55,7 +54,6 @@ public class DecaySurgicalStripper {
             }
             method.instructions.remove(postNodes.get(0));
             method.instructions.remove(postNodes.get(1));
-            HDL.LOGGER.info("[HDL-DEBUG] Surgically STRIPPED ForbiddenThings hook at {}.{} around {}", className, method.name, callInsn.name);
             cleaned = true;
         }
         if (cleaned) {
