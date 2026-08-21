@@ -234,7 +234,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean replaceIsPickable(Entity entity) {
-
         if (InvincibleHelper.isInvincible(entity)) {
             return false;
         }
@@ -246,7 +245,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean replaceIsAttackable(Entity entity) {
-
         if (InvincibleHelper.isInvincible(entity)) {
             return false;
         }
@@ -258,7 +256,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean replaceCanBeHitByProjectile(Entity entity) {
-
         if (InvincibleHelper.isInvincible(entity)) {
             return false;
         }
@@ -270,7 +267,6 @@ public class DecayEntityMethods {
     }
 
     public static boolean replaceIsPushable(Entity entity) {
-
         if (InvincibleHelper.isInvincible(entity)) {
             return false;
         }

@@ -1,6 +1,5 @@
 package com.maxwell.hyperdamagelib.mixin;
 
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -14,18 +13,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class ForgeHooksMixin {
     @Inject(method = "onLivingDeath", at = @At("HEAD"), cancellable = true)
     private static void onLivingDeathMixin(LivingEntity entity, DamageSource src, CallbackInfoReturnable<Boolean> cir) {
+
         if (InvincibleHelper.isInvincible(entity)) {
             cir.setReturnValue(true);
             cir.cancel();
-            return;
         }
-        if (entity instanceof IDecayEntity decay) {
-            float maxHp = entity.getMaxHealth();
-            if (decay.getDecayAmount() >= maxHp && maxHp > 0.0F) {
-                cir.setReturnValue(false);
-                cir.cancel();
-            }
-        }
+
     }
 
     @Inject(method = "onLivingAttack", at = @At("HEAD"), cancellable = true)

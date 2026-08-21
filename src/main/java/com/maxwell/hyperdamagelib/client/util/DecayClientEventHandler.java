@@ -47,22 +47,4 @@ public class DecayClientEventHandler {
             }
         }
     }
-
-    @SubscribeEvent
-    public static void onClientTickSafetyRenderSalvage(TickEvent.ClientTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        for (net.minecraft.world.entity.Entity entity : mc.level.entitiesForRendering()) {
-            if (entity instanceof LivingEntity living && entity instanceof IDecayEntity decay) {
-                if (decay.isSuperInvincible() && (living.deathTime > 0 || living.dead)) {
-                    living.dead = false;
-                    living.deathTime = 0;
-                    if (living.getPose() == Pose.DYING) {
-                        living.setPose(Pose.STANDING);
-                    }
-                }
-            }
-        }
-    }
 }

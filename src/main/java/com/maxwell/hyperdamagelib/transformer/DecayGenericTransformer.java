@@ -45,47 +45,34 @@ public class DecayGenericTransformer {
                 }
             }
         } else if (classNode.name.equals("net/minecraft/world/entity/Entity")) {
-                for (MethodNode method : classNode.methods) {
-
-                    if (isMethodNamed(method, "m_6084_", "isAlive", "()Z")) {
-                        injectHeadClean(method, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAlive", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                        modified = true;
-                    }
-
-                    else if (isMethodNamed(method, "m_6087_", "isPickable", "()Z")) {
-                        injectHeadClean(method, "shouldReplaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                        modified = true;
-                    }
-
-                    else if (isMethodNamed(method, "m_6097_", "isAttackable", "()Z")) {
-                        injectHeadClean(method, "shouldReplaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                        modified = true;
-                    }
-
-                    else if (isMethodNamed(method, "m_6094_", "canBeHitByProjectile", "()Z")) {
-                        injectHeadClean(method, "shouldReplaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                        modified = true;
-                    }
-
-                    else if (isMethodNamed(method, "m_6096_", "isPushable", "()Z")) {
-                        injectHeadClean(method, "shouldReplaceIsPushable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPushable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                        modified = true;
-                    }
-
-                    else if (isMethodNamed(method, "m_20343_", "setPosRaw", "(DDD)V") || isMethodNamed(method, "m_6034_", "setPos", "(DDD)V")) {
-                        injectPosProtection(method);
-                        modified = true;
-                    }
-                    else if (isMethodNamed(method, "m_142687_", "setRemoved", "(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) {
-                        injectRemovalProtection(method);
-                        modified = true;
-                    }
-                    else if (isMethodNamed(method, "m_6074_", "kill", "()V") || isMethodNamed(method, "m_146870_", "discard", "()V")) {
-                        injectVoidProtection(method, "shouldInterceptKill", "(Lnet/minecraft/world/entity/Entity;)Z");
-                        modified = true;
-                    }
+            for (MethodNode method : classNode.methods) {
+                if (isMethodNamed(method, "m_6084_", "isAlive", "()Z")) {
+                    injectHeadClean(method, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAlive", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_6087_", "isPickable", "()Z")) {
+                    injectHeadClean(method, "shouldReplaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_6097_", "isAttackable", "()Z")) {
+                    injectHeadClean(method, "shouldReplaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_6094_", "canBeHitByProjectile", "()Z")) {
+                    injectHeadClean(method, "shouldReplaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_6096_", "isPushable", "()Z")) {
+                    injectHeadClean(method, "shouldReplaceIsPushable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPushable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_20343_", "setPosRaw", "(DDD)V") || isMethodNamed(method, "m_6034_", "setPos", "(DDD)V")) {
+                    injectPosProtection(method);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_142687_", "setRemoved", "(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) {
+                    injectRemovalProtection(method);
+                    modified = true;
+                } else if (isMethodNamed(method, "m_6074_", "kill", "()V") || isMethodNamed(method, "m_146870_", "discard", "()V")) {
+                    injectVoidProtection(method, "shouldInterceptKill", "(Lnet/minecraft/world/entity/Entity;)Z");
+                    modified = true;
                 }
-            } else if (classNode.name.equals("net/minecraft/world/level/entity/EntityTickList")) {
+            }
+        } else if (classNode.name.equals("net/minecraft/world/level/entity/EntityTickList")) {
             for (MethodNode method : classNode.methods) {
                 if (isMethodNamed(method, "m_156914_", "remove", "(Lnet/minecraft/world/entity/Entity;)V")) {
                     injectTickListProtection(method);

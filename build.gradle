@@ -5,7 +5,6 @@ plugins {
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
     id 'org.parchmentmc.librarian.forgegradle' version '1.+'
-    id 'com.github.johnrengelman.shadow' version '8.1.1' // Shadow プラグイン
 }
 
 version = mod_version
@@ -16,10 +15,12 @@ base {
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
 mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.mixins.json"
 }
+
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
 minecraft {
@@ -60,11 +61,6 @@ minecraft {
     }
 }
 
-configurations {
-    shadow
-    implementation.extendsFrom shadow
-}
-
 repositories {
     maven {
         name "JEI"
@@ -91,8 +87,6 @@ sourceSets.main.resources {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
 
-    shadow 'net.bytebuddy:byte-buddy-agent:1.18.8'
-
     implementation fg.deobf("curse.maven:spark-361579:4738952")
     implementation fg.deobf("curse.maven:appleskin-248787:4770828")
     compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
@@ -111,28 +105,11 @@ dependencies {
     implementation fg.deobf("curse.maven:better-combat-by-daedelus-639842:7287334")
     implementation fg.deobf("curse.maven:playeranimator-658587:4587214")
     implementation fg.deobf("curse.maven:imds-reborn-1008701:8538912")
+
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
-task agentJar(type: Jar) {
-    archiveClassifier = 'agent'
-    from compileJava.destinationDirectory
-    include 'com/maxwell/hyperdamagelib/agent/**'
-
-    manifest {
-        attributes(
-                'Manifest-Version': '1.0',
-                'Premain-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
-                'Agent-Class': 'com.maxwell.hyperdamagelib.agent.DecayAgent',
-                'Can-Redefine-Classes': 'true',
-                'Can-Retransform-Classes': 'true'
-        )
-    }
-}
-
 tasks.named('processResources', ProcessResources).configure {
-    dependsOn agentJar
-
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
             forge_version: forge_version, forge_version_range: forge_version_range,
@@ -145,15 +122,9 @@ tasks.named('processResources', ProcessResources).configure {
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties + [project: project]
     }
-
-    from(agentJar) {
-        into 'META-INF/jarjar'
-        rename { 'decay-agent.jar' }
-    }
 }
 
 tasks.named('jar', Jar).configure {
-    archiveClassifier = 'raw'
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
@@ -162,41 +133,20 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                'MixinConfigs'            : "${mod_id}.mixins.json"
         ])
     }
 }
 
-shadowJar {
-    archiveClassifier = ''
-    configurations = [project.configurations.shadow]
-    relocate 'net.bytebuddy.agent', 'com.maxwell.hyperdamagelib.shadow.bytebuddy.agent'
-    exclude 'META-INF/maven/**'
-    exclude 'LICENSE'
-}
-
-reobf {
-    shadowJar {}
-}
-
-tasks.named('shadowJar').configure {
-    finalizedBy 'reobfShadowJar'
-}
-
-compileJava.doLast {
-    configurations.shadow.each { file ->
-        copy {
-            from zipTree(file)
-            into compileJava.destinationDirectory
-            exclude 'META-INF/**'
-        }
-    }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
 }
 
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
-            artifact shadowJar
+            artifact jar
         }
     }
     repositories {
@@ -204,8 +154,4 @@ publishing {
             url "file://${project.projectDir}/mcmodsrepo"
         }
     }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
 }

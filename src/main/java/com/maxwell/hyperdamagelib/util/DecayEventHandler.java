@@ -99,7 +99,23 @@ public class DecayEventHandler {
             }
         }
     }
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        UUID uuid = event.getEntity().getUUID();
+        InvincibleHelper.SERVER_INVINCIBLE.remove(uuid);
+        InvincibleHelper.SERVER_REMOVE_BYPASS.remove(uuid);
+        InvincibleHelper.CLIENT_INVINCIBLE.remove(uuid);
+        InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(uuid);
+    }
 
+    @SubscribeEvent
+    public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
+        InvincibleHelper.SERVER_INVINCIBLE.clear();
+        InvincibleHelper.SERVER_REMOVE_BYPASS.clear();
+        InvincibleHelper.CLIENT_INVINCIBLE.clear();
+        InvincibleHelper.CLIENT_REMOVE_BYPASS.clear();
+        DummyWatchdog.ACTIVE_DUMMIES.clear();
+    }
     @SubscribeEvent
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();

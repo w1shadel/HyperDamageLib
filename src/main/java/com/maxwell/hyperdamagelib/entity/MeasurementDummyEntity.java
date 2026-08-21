@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.UUID;
 
 public class MeasurementDummyEntity extends Mob implements IDecayEntity {
-    private final List<DamageRecord> damageRecords = new ArrayList<>();
-    private final List<HealRecord> healRecords = new ArrayList<>();
+    private final List<DamageRecord> damageRecords = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final List<HealRecord> healRecords = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final NonNullList<ItemStack> armorItems = NonNullList.withSize(4, ItemStack.EMPTY);
     private final NonNullList<ItemStack> handItems = NonNullList.withSize(2, ItemStack.EMPTY);
     private long lastDamageTime = 0;

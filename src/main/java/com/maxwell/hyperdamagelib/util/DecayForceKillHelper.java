@@ -34,30 +34,19 @@ public class DecayForceKillHelper {
         } finally {
             DecayDamageUtil.BYPASS_DECAY.remove();
         }
+
         DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
         entity.die(erosion);
         dropAllForce(entity);
+
         if (!(entity instanceof Player)) {
             if (entity instanceof IDecayEntity decay) {
                 decay.setRemoveBypass(true);
             }
-            tpRemove(entity);
+
+            entity.remove(Entity.RemovalReason.KILLED);
+            entity.discard();
             removeFromMemory(entity);
-        }
-    }
-
-    public static void tpRemove(Entity victim) {
-        forceSetPosition(victim, Double.MAX_VALUE, Double.MAX_VALUE, Double.MAX_VALUE);
-    }
-
-    public static void forceSetPosition(Entity entity, double x, double y, double z) {
-        entity.setPosRaw(x, y, z);
-        int X = Mth.floor(x);
-        int Y = Mth.floor(y);
-        int Z = Mth.floor(z);
-        entity.blockPosition = new BlockPos(X, Y, Z);
-        if (SectionPos.blockToSectionCoord(X) != entity.chunkPosition.x || SectionPos.blockToSectionCoord(Z) != entity.chunkPosition.z) {
-            entity.chunkPosition = new ChunkPos(entity.blockPosition);
         }
     }
 

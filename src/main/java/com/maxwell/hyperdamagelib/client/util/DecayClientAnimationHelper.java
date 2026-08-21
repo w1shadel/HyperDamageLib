@@ -215,16 +215,11 @@ public class DecayClientAnimationHelper {
             poseStack.popPose();
         }
     }
-
-    public static void applyGlobalItemAnimation(PoseStack poseStack, ItemStack stack, ItemDisplayContext displayContext) {
+    public static void applyItemTransformAnimation(PoseStack poseStack, ItemStack stack, ItemDisplayContext displayContext) {
         if (stack == null || stack.isEmpty()) return;
         DecayAnimationConfig config = DecayItemAnimationRegistry.getConfig(stack.getItem());
-        if (config != null) {
+        if (config != null && config.getAnimator() != null) {
             long time = System.currentTimeMillis();
-            MultiBufferSource bufferSource = CURRENT_RENDER_BUFFER.get();
-            if (bufferSource != null) {
-                renderGuiSlotAura(poseStack, bufferSource, time, config, displayContext);
-            }
             config.getAnimator().animate(poseStack, displayContext, stack, time);
         }
     }

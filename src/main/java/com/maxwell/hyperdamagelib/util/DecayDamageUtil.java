@@ -148,8 +148,16 @@ public final class DecayDamageUtil {
                 if (!hasTotem) {
                     if (target instanceof ServerPlayer sp && sp.connection != null) {
                         sp.connection.send(new ClientboundPlayerCombatKillPacket(sp.getId(), sp.getCombatTracker().getDeathMessage()));
+                        target.die(source);
+                    } else {
+
+                        target.die(source);
+                        if (target instanceof IDecayEntity decayTarget) {
+                            decayTarget.setRemoveBypass(true);
+                        }
+
+                        target.remove(Entity.RemovalReason.KILLED);
                     }
-                    target.die(source);
                 }
             } else {
                 try {

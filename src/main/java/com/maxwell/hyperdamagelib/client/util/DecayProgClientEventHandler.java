@@ -16,6 +16,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+
 @SuppressWarnings("removal")
 @Mod.EventBusSubscriber(modid = HDL.MODID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayProgClientEventHandler {
@@ -42,8 +43,11 @@ public class DecayProgClientEventHandler {
         }
         if (renderIntensity > 0.0F) {
             GameRenderer renderer = mc.gameRenderer;
-            if (renderer.currentEffect() == null || !DECAY_SHADER.toString().equals(renderer.currentEffect().getName())) {
-                renderer.loadEffect(DECAY_SHADER);
+            try {
+                if (renderer.currentEffect() == null || !DECAY_SHADER.toString().equals(renderer.currentEffect().getName())) {
+                    renderer.loadEffect(DECAY_SHADER);
+                }
+            } catch (Throwable t) {
             }
             PostChain chain = renderer.currentEffect();
             if (chain instanceof PostChainAccessor accessor) {
