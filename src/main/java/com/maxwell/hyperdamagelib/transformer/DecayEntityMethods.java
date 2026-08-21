@@ -12,31 +12,6 @@ public final class DecayEntityMethods {
     private DecayEntityMethods() {
     }
 
-    public static float getTrueHealth(LivingEntity entity) {
-        if (entity == null) return 0.0F;
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
-            if (entity instanceof IDecayEntity decay) {
-                return decay.getInvincibleHealthValue();
-            }
-            return entity.getHealth();
-        }
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
-        }
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
-            return -Float.MAX_VALUE;
-        }
-        float maxHp = entity.getMaxHealth();
-        if (Float.isNaN(maxHp) || maxHp <= 0.0F) maxHp = 20.0F;
-        float decayAmount = (entity instanceof IDecayEntity decay) ? decay.getDecayAmount() : 0.0F;
-        if (decayAmount >= maxHp) {
-            return -Float.MAX_VALUE;
-        }
-        float rawHealth = getRawEntityDataHealth(entity);
-        float cappedMax = Math.max(0.0F, maxHp - decayAmount);
-        return Math.max(0.0F, Math.min(rawHealth, cappedMax));
-    }
-
     public static boolean isReallyAlive(Entity entity) {
         if (entity == null) return false;
         if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
@@ -49,7 +24,7 @@ public final class DecayEntityMethods {
             return false;
         }
         if (entity instanceof LivingEntity living) {
-            return getTrueHealth(living) > 0.0F;
+            return living.getHealth() > 0.0F && living.deathTime == 0 && entity.getRemovalReason() == null;
         }
         return entity.getRemovalReason() == null;
     }
@@ -125,12 +100,46 @@ public final class DecayEntityMethods {
     public static boolean shouldReplaceHealthMethod(Entity entity) {
         if (DecayDamageUtil.BYPASS_DECAY.get()) return false;
         if (entity == null) return false;
+        if (entity instanceof LivingEntity living) {
+            if (!InvincibleHelper.isInvincible(entity) &&
+                    (!(entity instanceof IDecayEntity decay) || !decay.isSuperInvincible())) {
+                float rawHp = getRawEntityDataHealth(living);
+                if (rawHp <= 0.0F || living.deathTime > 0) {
+                    return false;
+                }
+            }
+        }
         if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible()))
             return true;
         if (entity instanceof MeasurementDummyEntity) return true;
         if (DecayDamageUtil.FORCE_DAMAGE.get()) return true;
         if (entity instanceof IDecayEntity decay && decay.getDecayAmount() > 0.0F) return true;
         return false;
+    }
+
+    public static float getTrueHealth(LivingEntity entity) {
+        if (entity == null) return 0.0F;
+        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
+            if (entity instanceof IDecayEntity decay) {
+                return decay.getInvincibleHealthValue();
+            }
+            return getRawEntityDataHealth(entity);
+        }
+        if (entity instanceof MeasurementDummyEntity dummy) {
+            return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
+        }
+        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
+            return -Float.MAX_VALUE;
+        }
+        float maxHp = entity.getMaxHealth();
+        if (Float.isNaN(maxHp) || maxHp <= 0.0F) maxHp = 20.0F;
+        float decayAmount = (entity instanceof IDecayEntity decay) ? decay.getDecayAmount() : 0.0F;
+        if (decayAmount >= maxHp) {
+            return -Float.MAX_VALUE;
+        }
+        float rawHealth = getRawEntityDataHealth(entity);
+        float cappedMax = Math.max(0.0F, maxHp - decayAmount);
+        return Math.max(0.0F, Math.min(rawHealth, cappedMax));
     }
 
     public static float replaceGetHealth(LivingEntity entity) {
@@ -181,6 +190,12 @@ public final class DecayEntityMethods {
 
     public static boolean shouldInterceptRemoval(Entity entity, Entity.RemovalReason reason) {
         if (entity == null || reason == null) return false;
+        if (reason == Entity.RemovalReason.DISCARDED ||
+                reason == Entity.RemovalReason.CHANGED_DIMENSION ||
+                reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER ||
+                reason == Entity.RemovalReason.UNLOADED_TO_CHUNK) {
+            return false;
+        }
         if (InvincibleHelper.isRemoveBypass(entity)) return false;
         if (entity instanceof MeasurementDummyEntity dummy && dummy.isRemoveBypass()) return false;
         return isProtected(entity);

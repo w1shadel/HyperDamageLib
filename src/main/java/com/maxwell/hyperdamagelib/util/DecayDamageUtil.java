@@ -224,4 +224,25 @@ public final class DecayDamageUtil {
             BYPASS_EFFECT.remove();
         }
     }
+
+    public static void restorePlayerLifeState(ServerPlayer player, float targetHealth) {
+        if (player == null || player.connection == null) return;
+        try {
+            BYPASS_DECAY.set(true);
+            player.dead = false;
+            ((LivingEntityAccessor) player).setDeadFlag(false);
+            player.deathTime = 0;
+            player.hurtTime = 0;
+            player.setPose(net.minecraft.world.entity.Pose.STANDING);
+            player.setHealth(targetHealth);
+            player.getCombatTracker().recheckStatus();
+            sendDirectDataPacket(player, targetHealth);
+            player.containerMenu.broadcastChanges();
+            player.inventoryMenu.broadcastChanges();
+            player.initMenu(player.containerMenu);
+
+        } finally {
+            BYPASS_DECAY.remove();
+        }
+    }
 }

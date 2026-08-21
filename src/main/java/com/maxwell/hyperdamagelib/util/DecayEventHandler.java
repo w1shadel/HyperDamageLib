@@ -103,19 +103,44 @@ public class DecayEventHandler {
     @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         UUID uuid = event.getEntity().getUUID();
-        InvincibleHelper.SERVER_INVINCIBLE.remove(uuid);
         InvincibleHelper.SERVER_REMOVE_BYPASS.remove(uuid);
-        InvincibleHelper.CLIENT_INVINCIBLE.remove(uuid);
         InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(uuid);
     }
 
     @SubscribeEvent
     public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
-        InvincibleHelper.SERVER_INVINCIBLE.clear();
         InvincibleHelper.SERVER_REMOVE_BYPASS.clear();
-        InvincibleHelper.CLIENT_INVINCIBLE.clear();
         InvincibleHelper.CLIENT_REMOVE_BYPASS.clear();
         DummyWatchdog.ACTIVE_DUMMIES.clear();
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        Player newPlayer = event.getEntity();
+        if (newPlayer instanceof IDecayEntity decayEntity) {
+            decayEntity.setDecayAmount(0.0F);
+            decayEntity.setSuperInvincible(false);
+            decayEntity.setHealBlocked(false);
+            decayEntity.setDecayHoldTicks(0);
+            decayEntity.setKeepCurrentHealth(false);
+        }
+        newPlayer.dead = false;
+        newPlayer.deathTime = 0;
+        newPlayer.setPose(Pose.STANDING);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            if (player instanceof IDecayEntity decay) {
+                decay.setDecayAmount(0.0F);
+                decay.setDecayHoldTicks(0);
+                decay.setHealBlocked(false);
+                decay.setSuperInvincible(false);
+                decay.setKeepCurrentHealth(false);
+            }
+            syncDecayState(player);
+        }
     }
 
     @SubscribeEvent
@@ -196,37 +221,6 @@ public class DecayEventHandler {
                 );
             }
         }
-    }
-
-    @SubscribeEvent
-    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            player.dead = false;
-            player.deathTime = 0;
-            player.setPose(Pose.STANDING);
-            if (player instanceof IDecayEntity decay) {
-                decay.setDecayAmount(0.0F);
-                decay.setDecayHoldTicks(0);
-                decay.setHealBlocked(false);
-                decay.setSuperInvincible(false);
-            }
-            InvincibleHelper.setInvincible(player, false);
-            InvincibleHelper.setRemoveBypass(player, false);
-            syncDecayState(player);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onPlayerClone(PlayerEvent.Clone event) {
-        Player newPlayer = event.getEntity();
-        if (newPlayer instanceof IDecayEntity decayEntity) {
-            decayEntity.setDecayAmount(0.0F);
-            decayEntity.setSuperInvincible(false);
-            decayEntity.setHealBlocked(false);
-            decayEntity.setDecayHoldTicks(0);
-        }
-        newPlayer.dead = false;
-        newPlayer.deathTime = 0;
     }
 
     @SubscribeEvent

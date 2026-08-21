@@ -1,11 +1,11 @@
 package com.maxwell.hyperdamagelib.mixin;
 
+import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
-import com.maxwell.hyperdamagelib.util.InvincibleHelper;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,6 +14,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = LivingEntity.class, priority = -10000000)
 public abstract class LivingEntityMixin implements IDecayEntity {
@@ -85,22 +86,32 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     @Override
     public void setSuperInvincible(boolean val) {
         LivingEntity self = (LivingEntity) (Object) this;
-        this.superInvincible = val;
-        self.setInvulnerable(val);
-        InvincibleHelper.setInvincible(self, val);
         if (val) {
+            float currentHp = self.getHealth();
+            if (Float.isNaN(currentHp) || currentHp <= 0.0F) {
+                currentHp = self.getMaxHealth();
+            } else {
+                currentHp = Math.min(currentHp, self.getMaxHealth());
+            }
+            this.keepCurrentHealth = true;
+            this.invincibleHealthValue = currentHp;
+            this.superInvincible = true;
+            self.setInvulnerable(true);
             this.dead = false;
             this.deathTime = 0;
             self.setPose(Pose.STANDING);
-            float currentHp = self.getHealth();
-            this.keepCurrentHealth = true;
-            this.invincibleHealthValue = (Float.isNaN(currentHp) || currentHp <= 0.0F) ?
-                    self.getMaxHealth() : Math.min(currentHp, self.getMaxHealth());
-            self.setHealth(this.invincibleHealthValue);
+            try {
+                DecayDamageUtil.BYPASS_DECAY.set(true);
+                self.setHealth(this.invincibleHealthValue);
+            } finally {
+                DecayDamageUtil.BYPASS_DECAY.remove();
+            }
         } else {
+            this.superInvincible = false;
+            self.setInvulnerable(false);
+            this.keepCurrentHealth = false;
             this.dead = false;
             this.deathTime = 0;
-            this.keepCurrentHealth = false;
         }
         decay$syncToTracking();
     }
@@ -146,9 +157,25 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
     }
 
+    @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
+    private void decay$lockHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        if (this.superInvincible) {
+            cir.setReturnValue(false);
+            cir.cancel();
+        }
+    }
+
+    @Inject(method = "die", at = @At("HEAD"), cancellable = true)
+    private void decay$lockDie(DamageSource source, CallbackInfo ci) {
+        if (this.superInvincible) {
+            ci.cancel();
+        }
+
+    }
+
     @Inject(method = "setHealth", at = @At("HEAD"), cancellable = true)
     private void decay$lockSetHealth(float nextHealth, CallbackInfo ci) {
-        if (!DecayDamageUtil.BYPASS_DECAY.get() && (this.superInvincible || InvincibleHelper.isInvincible((Entity) (Object) this))) {
+        if (!DecayDamageUtil.BYPASS_DECAY.get() && this.superInvincible) {
             ci.cancel();
         }
     }
@@ -157,13 +184,19 @@ public abstract class LivingEntityMixin implements IDecayEntity {
     private void decay$tickSafety(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
-            if (this.dead || this.deathTime > 0) {
+            if (this.dead || this.deathTime > 0 || ((LivingEntityAccessor) self).isDeadFlag()) {
                 this.dead = false;
+                ((LivingEntityAccessor) self).setDeadFlag(false);
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
             }
             if (self.getHealth() != this.invincibleHealthValue) {
-                self.setHealth(this.invincibleHealthValue);
+                try {
+                    DecayDamageUtil.BYPASS_DECAY.set(true);
+                    self.setHealth(this.invincibleHealthValue);
+                } finally {
+                    DecayDamageUtil.BYPASS_DECAY.remove();
+                }
             }
         }
     }
