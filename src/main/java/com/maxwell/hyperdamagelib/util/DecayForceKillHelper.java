@@ -1,10 +1,8 @@
 package com.maxwell.hyperdamagelib.util;
 
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
-import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -14,39 +12,48 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.*;
 
 import java.util.Objects;
 
 public class DecayForceKillHelper {
+
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
-        breakBrain(entity);
-        if (entity instanceof IDecayEntity decay) {
-            decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
-        }
+
         try {
-            DecayDamageUtil.BYPASS_DECAY.set(true);
-            entity.setHealth(0.0F);
-            entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
-        } finally {
-            DecayDamageUtil.BYPASS_DECAY.remove();
-        }
 
-        DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
-        entity.die(erosion);
-        dropAllForce(entity);
+            DecayDamageUtil.FORCE_DAMAGE.set(true);
 
-        if (!(entity instanceof Player)) {
+            breakBrain(entity);
+
             if (entity instanceof IDecayEntity decay) {
-                decay.setRemoveBypass(true);
+                decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
             }
 
-            entity.remove(Entity.RemovalReason.KILLED);
-            entity.discard();
-            removeFromMemory(entity);
+            try {
+                DecayDamageUtil.BYPASS_DECAY.set(true);
+                entity.setHealth(0.0F);
+                entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
+            } finally {
+                DecayDamageUtil.BYPASS_DECAY.remove();
+            }
+
+            DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
+            entity.die(erosion);
+            dropAllForce(entity);
+
+            if (!(entity instanceof Player)) {
+                if (entity instanceof IDecayEntity decay) {
+                    decay.setRemoveBypass(true);
+                }
+                entity.remove(Entity.RemovalReason.KILLED);
+                entity.discard();
+                removeFromMemory(entity);
+            }
+        } finally {
+            DecayDamageUtil.FORCE_DAMAGE.remove();
         }
     }
 
@@ -58,8 +65,7 @@ public class DecayForceKillHelper {
                 breakGoalSelector(mob.targetSelector);
                 mob.setTarget(null);
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static void breakGoalSelector(GoalSelector goalSelector) {
@@ -71,8 +77,7 @@ public class DecayForceKillHelper {
                     return false;
                 }
             });
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static void dropAllForce(LivingEntity livingEntity) {

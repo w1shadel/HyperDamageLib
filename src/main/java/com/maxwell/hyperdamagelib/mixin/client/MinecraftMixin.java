@@ -1,5 +1,6 @@
 package com.maxwell.hyperdamagelib.mixin.client;
 
+import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.DeathScreen;
@@ -15,15 +16,18 @@ import javax.annotation.Nullable;
 
 @Mixin(Minecraft.class)
 public class MinecraftMixin {
-    @Shadow
-    @Nullable
-    public LocalPlayer player;
 
     @Inject(method = "setScreen", at = @At("HEAD"), cancellable = true)
     public void setScreenMixin(Screen screen, CallbackInfo ci) {
+        Minecraft mc = (Minecraft) (Object) this;
+        LocalPlayer player = mc.player;
         if (player == null) return;
-        if (screen instanceof DeathScreen && InvincibleHelper.isInvincible(player)) {
-            ci.cancel();
+
+        if (screen instanceof DeathScreen) {
+            if (InvincibleHelper.isInvincible(player) ||
+                    (player instanceof IDecayEntity decay && decay.isSuperInvincible())) {
+                ci.cancel();
+            }
         }
     }
 }

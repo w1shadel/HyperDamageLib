@@ -1,5 +1,6 @@
 package com.maxwell.hyperdamagelib.mixin;
 
+import com.maxwell.hyperdamagelib.util.DecayHookTracer;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
@@ -28,9 +29,11 @@ public class ForgeHooksMixin {
             cir.cancel();
         }
     }
-
     @Inject(method = "onLivingHurt", at = @At("HEAD"), cancellable = true)
     private static void onLivingHurtMixin(LivingEntity entity, DamageSource src, float amount, CallbackInfoReturnable<Float> cir) {
+
+        DecayHookTracer.traceCall("ForgeHooks.onLivingHurt (Mixin)", entity, "DamageAmount: " + amount + " by " + src.getMsgId());
+
         if (InvincibleHelper.isInvincible(entity)) {
             cir.setReturnValue(0.0F);
             cir.cancel();
