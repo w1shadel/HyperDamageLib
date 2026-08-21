@@ -15,7 +15,6 @@ public class DecayLaunchPlugin implements ILaunchPluginService {
     @Override
     public EnumSet<Phase> handlesClass(Type type, boolean isEmpty) {
         String className = type.getClassName();
-
         if (className.startsWith("com.maxwell.hyperdamagelib.") ||
                 className.contains(".mixin.") ||
                 className.contains(".mixins.") ||
@@ -41,12 +40,10 @@ public class DecayLaunchPlugin implements ILaunchPluginService {
         }
         boolean modified = false;
         try {
-
             modified = DecayGenericTransformer.transform(classNode);
         } catch (Throwable t) {
             return ComputeFlags.NO_REWRITE;
         }
-
         return modified ? ComputeFlags.SIMPLE_REWRITE : ComputeFlags.NO_REWRITE;
     }
 }

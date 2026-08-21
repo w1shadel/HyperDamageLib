@@ -18,20 +18,14 @@ import net.minecraft.world.level.entity.*;
 import java.util.Objects;
 
 public class DecayForceKillHelper {
-
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
-
         try {
-
             DecayDamageUtil.FORCE_DAMAGE.set(true);
-
             breakBrain(entity);
-
             if (entity instanceof IDecayEntity decay) {
                 decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
             }
-
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 entity.setHealth(0.0F);
@@ -39,11 +33,9 @@ public class DecayForceKillHelper {
             } finally {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
-
             DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
             entity.die(erosion);
             dropAllForce(entity);
-
             if (!(entity instanceof Player)) {
                 if (entity instanceof IDecayEntity decay) {
                     decay.setRemoveBypass(true);
@@ -65,7 +57,8 @@ public class DecayForceKillHelper {
                 breakGoalSelector(mob.targetSelector);
                 mob.setTarget(null);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void breakGoalSelector(GoalSelector goalSelector) {
@@ -77,7 +70,8 @@ public class DecayForceKillHelper {
                     return false;
                 }
             });
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static void dropAllForce(LivingEntity livingEntity) {

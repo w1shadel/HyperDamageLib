@@ -14,7 +14,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public class ForgeHooksMixin {
     @Inject(method = "onLivingDeath", at = @At("HEAD"), cancellable = true)
     private static void onLivingDeathMixin(LivingEntity entity, DamageSource src, CallbackInfoReturnable<Boolean> cir) {
-
         if (InvincibleHelper.isInvincible(entity)) {
             cir.setReturnValue(true);
             cir.cancel();
@@ -29,11 +28,10 @@ public class ForgeHooksMixin {
             cir.cancel();
         }
     }
+
     @Inject(method = "onLivingHurt", at = @At("HEAD"), cancellable = true)
     private static void onLivingHurtMixin(LivingEntity entity, DamageSource src, float amount, CallbackInfoReturnable<Float> cir) {
-
         DecayHookTracer.traceCall("ForgeHooks.onLivingHurt (Mixin)", entity, "DamageAmount: " + amount + " by " + src.getMsgId());
-
         if (InvincibleHelper.isInvincible(entity)) {
             cir.setReturnValue(0.0F);
             cir.cancel();

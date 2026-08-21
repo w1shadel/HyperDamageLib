@@ -6,13 +6,13 @@
   "refmap": "hyperdamagelib.refmap.json",
   "mixins": [
     "EntityMixin",
+    "ForgeHooksMixin",
     "LivingEntityMixin",
     "ServerLevelMixin",
     "ServerPlayerMixin",
-    "ForgeHooksMixin",
+    "accessor.EntityAccessor",
     "accessor.LivingEntityAccessor",
-    "accessor.SynchedEntityDataAccessor",
-    "accessor.EntityAccessor"
+    "accessor.SynchedEntityDataAccessor"
   ],
   "client": [
     "client.ClientPacketListenerMixin",

@@ -17,7 +17,6 @@ public class ItemTransformMixin {
         ItemStack stack = DecayClientAnimationHelper.CURRENT_RENDER_STACK.get();
         ItemDisplayContext displayContext = DecayClientAnimationHelper.CURRENT_RENDER_CONTEXT.get();
         if (stack != null && !stack.isEmpty() && displayContext != null) {
-
             DecayClientAnimationHelper.applyItemTransformAnimation(poseStack, stack, displayContext);
         }
     }

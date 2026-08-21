@@ -150,12 +150,10 @@ public final class DecayDamageUtil {
                         sp.connection.send(new ClientboundPlayerCombatKillPacket(sp.getId(), sp.getCombatTracker().getDeathMessage()));
                         target.die(source);
                     } else {
-
                         target.die(source);
                         if (target instanceof IDecayEntity decayTarget) {
                             decayTarget.setRemoveBypass(true);
                         }
-
                         target.remove(Entity.RemovalReason.KILLED);
                     }
                 }

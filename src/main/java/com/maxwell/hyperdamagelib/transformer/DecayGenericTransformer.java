@@ -1,22 +1,20 @@
 package com.maxwell.hyperdamagelib.transformer;
 
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 public final class DecayGenericTransformer {
     private static final String ENTITY_METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
 
-    private DecayGenericTransformer() {}
+    private DecayGenericTransformer() {
+    }
 
     public static boolean transform(ClassNode classNode) {
         boolean modified = false;
-
         for (MethodNode method : classNode.methods) {
             if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
             modified |= sanitizeCallerInstructions(method);
         }
-
         if (classNode.name.equals("net/minecraft/world/entity/LivingEntity")) {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
@@ -71,16 +69,13 @@ public final class DecayGenericTransformer {
                 }
             }
         }
-
         return modified;
     }
-
 
     private static boolean sanitizeCallerInstructions(MethodNode method) {
         boolean modified = false;
         for (AbstractInsnNode insn : method.instructions.toArray()) {
             if (insn instanceof MethodInsnNode minsn) {
-
                 if (minsn.getOpcode() == Opcodes.INVOKEVIRTUAL) {
                     if (isLivingEntityClass(minsn.owner)) {
                         if ((minsn.name.equals("getHealth") || minsn.name.equals("m_21223_")) && minsn.desc.equals("()F")) {
@@ -112,12 +107,9 @@ public final class DecayGenericTransformer {
                             modified = true;
                         }
                     }
-                }
-
-                else if (minsn.getOpcode() == Opcodes.INVOKEINTERFACE && !isSystemPackage(minsn.owner)) {
+                } else if (minsn.getOpcode() == Opcodes.INVOKEINTERFACE && !isSystemPackage(minsn.owner)) {
                     String desc = minsn.desc;
                     String name = minsn.name;
-
                     if (desc.startsWith("(FLjava/lang/Object;") && desc.endsWith(")F")) {
                         minsn.setOpcode(Opcodes.INVOKESTATIC);
                         minsn.owner = ENTITY_METHODS;
@@ -125,14 +117,11 @@ public final class DecayGenericTransformer {
                         minsn.desc = "(Ljava/lang/Object;FLjava/lang/Object;Ljava/lang/Object;)F";
                         minsn.itf = false;
                         modified = true;
-                    }
-
-                    else if (desc.startsWith("(ZLjava/lang/Object;") && desc.endsWith(")Z")) {
+                    } else if (desc.startsWith("(ZLjava/lang/Object;") && desc.endsWith(")Z")) {
                         minsn.setOpcode(Opcodes.INVOKESTATIC);
                         minsn.owner = ENTITY_METHODS;
                         minsn.itf = false;
                         minsn.desc = "(Ljava/lang/Object;ZLjava/lang/Object;Ljava/lang/Object;)Z";
-
                         if (name.contains("Dead") || name.contains("dead")) {
                             minsn.name = "sanitizeHookDeadOrDying";
                         } else if (name.contains("Removed") || name.contains("removed")) {
@@ -142,9 +131,7 @@ public final class DecayGenericTransformer {
                         }
                         modified = true;
                     }
-                }
-
-                else if (minsn.getOpcode() == Opcodes.INVOKESTATIC && !isSystemPackage(minsn.owner)) {
+                } else if (minsn.getOpcode() == Opcodes.INVOKESTATIC && !isSystemPackage(minsn.owner)) {
                     if (minsn.desc.equals("(FLnet/minecraft/world/entity/LivingEntity;)F")) {
                         minsn.owner = ENTITY_METHODS;
                         minsn.name = "sanitizeStaticHealth";

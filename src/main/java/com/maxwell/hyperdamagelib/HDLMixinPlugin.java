@@ -1,7 +1,6 @@
 package com.maxwell.hyperdamagelib;
 
 import com.maxwell.hyperdamagelib.transformer.DecayBootstrap;
-import com.maxwell.hyperdamagelib.transformer.DecayGenericTransformer;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
@@ -44,20 +43,5 @@ public class HDLMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     }
 }

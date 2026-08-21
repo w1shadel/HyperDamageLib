@@ -2,8 +2,10 @@ package com.maxwell.hyperdamagelib.mixin;
 
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
+import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import org.spongepowered.asm.mixin.Mixin;
@@ -90,15 +92,15 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             this.dead = false;
             this.deathTime = 0;
             self.setPose(Pose.STANDING);
-            if (this.keepCurrentHealth) {
-                this.invincibleHealthValue = Math.max(1.0f, Math.min(self.getHealth(), self.getMaxHealth()));
-            } else {
-                this.invincibleHealthValue = self.getMaxHealth();
-            }
+            float currentHp = self.getHealth();
+            this.keepCurrentHealth = true;
+            this.invincibleHealthValue = (Float.isNaN(currentHp) || currentHp <= 0.0F) ?
+                    self.getMaxHealth() : Math.min(currentHp, self.getMaxHealth());
             self.setHealth(this.invincibleHealthValue);
         } else {
             this.dead = false;
             this.deathTime = 0;
+            this.keepCurrentHealth = false;
         }
         decay$syncToTracking();
     }
@@ -144,6 +146,13 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         }
     }
 
+    @Inject(method = "setHealth", at = @At("HEAD"), cancellable = true)
+    private void decay$lockSetHealth(float nextHealth, CallbackInfo ci) {
+        if (!DecayDamageUtil.BYPASS_DECAY.get() && (this.superInvincible || InvincibleHelper.isInvincible((Entity) (Object) this))) {
+            ci.cancel();
+        }
+    }
+
     @Inject(method = "baseTick", at = @At("HEAD"))
     private void decay$tickSafety(CallbackInfo ci) {
         LivingEntity self = (LivingEntity) (Object) this;
@@ -152,8 +161,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 this.dead = false;
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
-                self.setHealth(this.keepCurrentHealth ? this.invincibleHealthValue : self.getMaxHealth());
-                decay$syncToTracking();
+            }
+            if (self.getHealth() != this.invincibleHealthValue) {
+                self.setHealth(this.invincibleHealthValue);
             }
         }
     }

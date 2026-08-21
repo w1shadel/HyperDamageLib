@@ -215,6 +215,7 @@ public class DecayClientAnimationHelper {
             poseStack.popPose();
         }
     }
+
     public static void applyItemTransformAnimation(PoseStack poseStack, ItemStack stack, ItemDisplayContext displayContext) {
         if (stack == null || stack.isEmpty()) return;
         DecayAnimationConfig config = DecayItemAnimationRegistry.getConfig(stack.getItem());

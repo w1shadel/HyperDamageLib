@@ -5,7 +5,6 @@ import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;

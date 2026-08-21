@@ -25,7 +25,6 @@ public abstract class ItemRendererMixin {
 
     @Inject(method = "render", at = @At("TAIL"))
     private void decay$onRenderTail(ItemStack stack, ItemDisplayContext displayContext, boolean leftHand, PoseStack poseStack, MultiBufferSource bufferSource, int combinedLight, int combinedOverlay, BakedModel model, CallbackInfo ci) {
-
         if (stack != null && !stack.isEmpty() && bufferSource != null) {
             DecayAnimationConfig config = DecayItemAnimationRegistry.getConfig(stack.getItem());
             if (config != null && config.hasAura()) {

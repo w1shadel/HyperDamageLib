@@ -99,6 +99,7 @@ public class DecayEventHandler {
             }
         }
     }
+
     @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         UUID uuid = event.getEntity().getUUID();
@@ -116,6 +117,7 @@ public class DecayEventHandler {
         InvincibleHelper.CLIENT_REMOVE_BYPASS.clear();
         DummyWatchdog.ACTIVE_DUMMIES.clear();
     }
+
     @SubscribeEvent
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();

@@ -71,23 +71,32 @@ public class ErosionSwordItem extends SwordItem {
         if (!level.isClientSide()) {
             if (player.isShiftKeyDown()) {
                 boolean nextState = !InvincibleHelper.isInvincible(player);
-                InvincibleHelper.setInvincible(player, nextState);
                 if (player instanceof IDecayEntity decay) {
                     decay.setSuperInvincible(nextState);
+                    if (nextState) {
+                        float lockedHp = decay.getInvincibleHealthValue();
+                        player.displayClientMessage(
+                                Component.translatable("message.hyperdamagelib.super_invincible.on_current", String.format("%.1f", lockedHp)),
+                                true
+                        );
+                    } else {
+                        try {
+                            DecayDamageUtil.BYPASS_DECAY.set(true);
+                            player.setHealth(decay.getInvincibleHealthValue());
+                            decay.setDecayAmount(0.0F);
+                            decay.setDecayHoldTicks(0);
+                            player.dead = false;
+                            player.deathTime = 0;
+                        } finally {
+                            DecayDamageUtil.BYPASS_DECAY.remove();
+                        }
+                        player.displayClientMessage(
+                                Component.translatable("message.hyperdamagelib.super_invincible.off"),
+                                true
+                        );
+                    }
                 }
-                player.displayClientMessage(
-                        Component.literal(nextState ? "§d[Super Invincible Mode] ON" : "§7[Super Invincible Mode] OFF"),
-                        true
-                );
                 level.playSound(null, player.blockPosition(), nextState ? SoundEvents.BEACON_ACTIVATE : SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
-            } else {
-                DamageSource source = DecayDamageUtil.getErosionSource(level, player);
-                AABB aoe = player.getBoundingBox().inflate(6.0D);
-                List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, aoe, e -> e != player);
-                for (LivingEntity target : targets) {
-                    DecayDamageUtil.applyCustomDamage(target, source, 40.0F);
-                }
-                player.getCooldowns().addCooldown(this, 50);
             }
         }
         return InteractionResultHolder.success(player.getItemInHand(hand));
