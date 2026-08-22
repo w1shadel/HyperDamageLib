@@ -103,15 +103,28 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 self.setHealth(this.invincibleHealthValue);
+                self.getEntityData().set(LivingEntityAccessor.getDataHealthId(), this.invincibleHealthValue);
             } finally {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
         } else {
+
             this.superInvincible = false;
             self.setInvulnerable(false);
             this.keepCurrentHealth = false;
+            this.decayAmount = 0.0F;
+            this.decayHoldTicks = 0;
             this.dead = false;
             this.deathTime = 0;
+            self.setPose(Pose.STANDING);
+            try {
+                DecayDamageUtil.BYPASS_DECAY.set(true);
+                float targetHp = this.invincibleHealthValue > 0.0F ? this.invincibleHealthValue : self.getMaxHealth();
+                self.setHealth(targetHp);
+                self.getEntityData().set(LivingEntityAccessor.getDataHealthId(), targetHp);
+            } finally {
+                DecayDamageUtil.BYPASS_DECAY.remove();
+            }
         }
         decay$syncToTracking();
     }
@@ -190,10 +203,13 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
             }
-            if (self.getHealth() != this.invincibleHealthValue) {
+
+            Float rawHp = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+            if (rawHp == null || rawHp != this.invincibleHealthValue || rawHp <= 0.0F) {
                 try {
                     DecayDamageUtil.BYPASS_DECAY.set(true);
                     self.setHealth(this.invincibleHealthValue);
+                    self.getEntityData().set(LivingEntityAccessor.getDataHealthId(), this.invincibleHealthValue);
                 } finally {
                     DecayDamageUtil.BYPASS_DECAY.remove();
                 }
