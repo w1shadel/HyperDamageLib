@@ -108,7 +108,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
         } else {
-
             this.superInvincible = false;
             self.setInvulnerable(false);
             this.keepCurrentHealth = false;
@@ -203,7 +202,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
                 this.deathTime = 0;
                 self.setPose(Pose.STANDING);
             }
-
             Float rawHp = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
             if (rawHp == null || rawHp != this.invincibleHealthValue || rawHp <= 0.0F) {
                 try {
