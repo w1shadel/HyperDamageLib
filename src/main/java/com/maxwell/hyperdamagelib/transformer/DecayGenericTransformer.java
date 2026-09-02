@@ -3,68 +3,42 @@ package com.maxwell.hyperdamagelib.transformer;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-public final class DecayGenericTransformer {
-    private static final String ENTITY_METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
+public final class DecayGenericTransformer implements Opcodes {
+    private static final String METHODS = "com/maxwell/hyperdamagelib/transformer/DecayEntityMethods";
 
-    private DecayGenericTransformer() {
-    }
-
-    public static boolean transform(ClassNode classNode) {
+    public static boolean transform(ClassNode node) {
         boolean modified = false;
-        for (MethodNode method : classNode.methods) {
-            if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
-            modified |= sanitizeCallerInstructions(method);
+        for (MethodNode mn : node.methods) {
+            if ((mn.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
+            modified |= sanitizeCallerInstructions(mn);
         }
-        if (classNode.name.equals("net/minecraft/world/entity/LivingEntity")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
-                if (isMethod(method, "m_21223_", "getHealth", "()F")) {
-                    injectHeadReturn(method, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceGetHealth", "(Lnet/minecraft/world/entity/LivingEntity;)F", Opcodes.FRETURN);
-                    modified = true;
-                } else if (isMethod(method, "m_21224_", "isDeadOrDying", "()Z")) {
-                    injectHeadReturn(method, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsDeadOrDying", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                    modified = true;
-                }
+        if (node.name.equals("net/minecraft/world/entity/LivingEntity")) {
+            for (MethodNode mn : node.methods) {
+                if (isM(mn, "m_6667_", "die", "(Lnet/minecraft/world/damagesource/DamageSource;)V")) {injectGuard(mn, "shouldInterceptDie", "(Lnet/minecraft/world/entity/LivingEntity;)Z", false);modified = true;}
+                else if (isM(mn, "m_8119_", "baseTick", "()V")) {injectStatic(mn, "forceStateSync", "(Lnet/minecraft/world/entity/LivingEntity;)V");modified = true;}
+                else if (isM(mn, "m_6153_", "tickDeath", "()V")) {injectGuard(mn, "shouldInterceptTickDeath", "(Lnet/minecraft/world/entity/LivingEntity;)Z", false);modified = true;}
+                else if (isM(mn, "m_21223_", "getHealth", "()F")) injectReplace(mn, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceGetHealth", "(Lnet/minecraft/world/entity/LivingEntity;)F", FRETURN);
+                else if (isM(mn, "m_21224_", "isDeadOrDying", "()Z")) injectReplace(mn, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsDeadOrDying", "(Lnet/minecraft/world/entity/Entity;)Z", IRETURN);
+                modified |= scanFields(mn);
             }
-        } else if (classNode.name.equals("net/minecraft/world/entity/Entity")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
-                if (isMethod(method, "m_6084_", "isAlive", "()Z")) {
-                    injectHeadReturn(method, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAlive", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                    modified = true;
-                } else if (isMethod(method, "m_6087_", "isPickable", "()Z")) {
-                    injectHeadReturn(method, "shouldReplaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                    modified = true;
-                } else if (isMethod(method, "m_6097_", "isAttackable", "()Z")) {
-                    injectHeadReturn(method, "shouldReplaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                    modified = true;
-                } else if (isMethod(method, "m_6094_", "canBeHitByProjectile", "()Z")) {
-                    injectHeadReturn(method, "shouldReplaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", Opcodes.IRETURN);
-                    modified = true;
-                } else if (isMethod(method, "m_20343_", "setPosRaw", "(DDD)V") || isMethod(method, "m_6034_", "setPos", "(DDD)V")) {
-                    injectPosGuard(method);
-                    modified = true;
-                } else if (isMethod(method, "m_142687_", "setRemoved", "(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) {
-                    injectRemovalGuard(method);
-                    modified = true;
-                } else if (isMethod(method, "m_6074_", "kill", "()V") || isMethod(method, "m_146870_", "discard", "()V")) {
-                    injectVoidGuard(method);
-                    modified = true;
-                }
+            modified = true;
+        }else if (node.name.equals("net/minecraft/world/entity/Entity")) {
+            for (MethodNode mn : node.methods) {
+                if (isM(mn, "m_6084_", "isAlive", "()Z")) injectReplace(mn, "shouldReplaceHealthMethod", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAlive", "(Lnet/minecraft/world/entity/Entity;)Z", IRETURN);
+                else if (isM(mn, "m_6087_", "isPickable", "()Z")) injectReplace(mn, "shouldReplaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsPickable", "(Lnet/minecraft/world/entity/Entity;)Z", IRETURN);
+                else if (isM(mn, "m_6097_", "isAttackable", "()Z")) injectReplace(mn, "shouldReplaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceIsAttackable", "(Lnet/minecraft/world/entity/Entity;)Z", IRETURN);
+                else if (isM(mn, "m_6094_", "canBeHitByProjectile", "()Z")) injectReplace(mn, "shouldReplaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", "replaceCanBeHitByProjectile", "(Lnet/minecraft/world/entity/Entity;)Z", IRETURN);
+                else if (isM(mn, "m_20343_", "setPosRaw", "(DDD)V") || isM(mn, "m_6034_", "setPos", "(DDD)V")) injectGuard(mn, "shouldInterceptSetPos", "(Lnet/minecraft/world/entity/Entity;DDD)Z", true);
+                else if (isM(mn, "m_142687_", "setRemoved", "(Lnet/minecraft/world/entity/Entity$RemovalReason;)V")) injectGuard(mn, "shouldInterceptRemoval", "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity$RemovalReason;)Z", false);
+                else if (isM(mn, "m_6074_", "kill", "()V") || isM(mn, "m_146870_", "discard", "()V")) injectGuard(mn, "shouldInterceptKill", "(Lnet/minecraft/world/entity/Entity;)Z", false);
+                else if (isM(mn, "m_20124_", "setPose", "(Lnet/minecraft/world/entity/Pose;)V")) {injectGuard(mn, "shouldInterceptSetPose", "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Pose;)Z", false);modified = true;}
             }
-        } else if (classNode.name.equals("net/minecraft/world/level/entity/EntityTickList")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
-                if (isMethod(method, "m_156914_", "remove", "(Lnet/minecraft/world/entity/Entity;)V")) {
-                    injectTickListGuard(method);
-                    modified = true;
-                }
-            }
-        } else if (classNode.name.equals("net/minecraft/world/level/entity/EntityLookup")) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.access & (Opcodes.ACC_ABSTRACT | Opcodes.ACC_NATIVE)) != 0) continue;
-                if (isMethod(method, "m_156820_", "remove", "(Lnet/minecraft/world/level/entity/EntityAccess;)V")) {
-                    injectLookupGuard(method);
+            modified = true;
+        } else if (node.name.equals("net/minecraft/world/level/entity/EntityTickList") || node.name.equals("net/minecraft/world/level/entity/EntityLookup")) {
+            boolean isLookup = node.name.endsWith("Lookup");
+            for (MethodNode mn : node.methods) {
+                if (mn.name.equals("remove")) {
+                    injectGuard(mn, isLookup ? "shouldInterceptLookupRemove" : "shouldInterceptTickListRemove", isLookup ? "(Ljava/lang/Object;)Z" : "(Lnet/minecraft/world/entity/Entity;)Z", false);
                     modified = true;
                 }
             }
@@ -72,197 +46,136 @@ public final class DecayGenericTransformer {
         return modified;
     }
 
-    private static boolean sanitizeCallerInstructions(MethodNode method) {
+    private static boolean sanitizeCallerInstructions(MethodNode mn) {
         boolean modified = false;
-        for (AbstractInsnNode insn : method.instructions.toArray()) {
-            if (insn instanceof MethodInsnNode minsn) {
-                if (minsn.getOpcode() == Opcodes.INVOKEVIRTUAL) {
-                    if (isLivingEntityClass(minsn.owner)) {
-                        if ((minsn.name.equals("getHealth") || minsn.name.equals("m_21223_")) && minsn.desc.equals("()F")) {
-                            minsn.setOpcode(Opcodes.INVOKESTATIC);
-                            minsn.owner = ENTITY_METHODS;
-                            minsn.name = "getTrueHealth";
-                            minsn.desc = "(Lnet/minecraft/world/entity/LivingEntity;)F";
-                            modified = true;
-                        } else if ((minsn.name.equals("isDeadOrDying") || minsn.name.equals("m_21224_")) && minsn.desc.equals("()Z")) {
-                            minsn.setOpcode(Opcodes.INVOKESTATIC);
-                            minsn.owner = ENTITY_METHODS;
-                            minsn.name = "isReallyDeadOrDying";
-                            minsn.desc = "(Lnet/minecraft/world/entity/LivingEntity;)Z";
-                            modified = true;
-                        }
-                    }
-                    if (isAnyEntityClass(minsn.owner)) {
-                        if ((minsn.name.equals("isAlive") || minsn.name.equals("m_6084_")) && minsn.desc.equals("()Z")) {
-                            minsn.setOpcode(Opcodes.INVOKESTATIC);
-                            minsn.owner = ENTITY_METHODS;
-                            minsn.name = "isReallyAlive";
-                            minsn.desc = "(Lnet/minecraft/world/entity/Entity;)Z";
-                            modified = true;
-                        } else if ((minsn.name.equals("isRemoved") || minsn.name.equals("m_213877_")) && minsn.desc.equals("()Z")) {
-                            minsn.setOpcode(Opcodes.INVOKESTATIC);
-                            minsn.owner = ENTITY_METHODS;
-                            minsn.name = "isReallyRemoved";
-                            minsn.desc = "(Lnet/minecraft/world/entity/Entity;)Z";
-                            modified = true;
-                        }
-                    }
-                } else if (minsn.getOpcode() == Opcodes.INVOKEINTERFACE && !isSystemPackage(minsn.owner)) {
-                    String desc = minsn.desc;
-                    String name = minsn.name;
-                    if (desc.startsWith("(FLjava/lang/Object;") && desc.endsWith(")F")) {
-                        minsn.setOpcode(Opcodes.INVOKESTATIC);
-                        minsn.owner = ENTITY_METHODS;
-                        minsn.name = "sanitizeHookHealth";
-                        minsn.desc = "(Ljava/lang/Object;FLjava/lang/Object;Ljava/lang/Object;)F";
-                        minsn.itf = false;
-                        modified = true;
-                    } else if (desc.startsWith("(ZLjava/lang/Object;") && desc.endsWith(")Z")) {
-                        minsn.setOpcode(Opcodes.INVOKESTATIC);
-                        minsn.owner = ENTITY_METHODS;
-                        minsn.itf = false;
-                        minsn.desc = "(Ljava/lang/Object;ZLjava/lang/Object;Ljava/lang/Object;)Z";
-                        if (name.contains("Dead") || name.contains("dead")) {
-                            minsn.name = "sanitizeHookDeadOrDying";
-                        } else if (name.contains("Removed") || name.contains("removed")) {
-                            minsn.name = "sanitizeHookRemoved";
-                        } else {
-                            minsn.name = "sanitizeHookAlive";
-                        }
+        for (AbstractInsnNode insn : mn.instructions.toArray()) {
+            if (!(insn instanceof MethodInsnNode mi)) continue;
+
+            if (mi.getOpcode() == INVOKEVIRTUAL) {
+                if (isEntity(mi.owner)) {
+                    if (isM(mi, "m_21223_", "getHealth", "()F")) modified |= redir(mi, "getTrueHealth", "(Lnet/minecraft/world/entity/LivingEntity;)F");
+                    else if (isM(mi, "m_21224_", "isDeadOrDying", "()Z")) modified |= redir(mi, "isReallyDeadOrDying", "(Lnet/minecraft/world/entity/LivingEntity;)Z");
+                    else if (isM(mi, "m_6084_", "isAlive", "()Z")) modified |= redir(mi, "isReallyAlive", "(Lnet/minecraft/world/entity/Entity;)Z");
+                    else if (isM(mi, "m_213877_", "isRemoved", "()Z")) modified |= redir(mi, "isReallyRemoved", "(Lnet/minecraft/world/entity/Entity;)Z");
+                }
+
+                else if (mi.owner.equals("net/minecraft/network/syncher/SynchedEntityData")) {
+
+                    if (mi.desc.equals("(Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;)V") && (mi.name.equals("set") || mi.name.equals("m_135381_"))) {
+                        mi.setOpcode(INVOKESTATIC);
+                        mi.owner = METHODS;
+                        mi.name = "interceptDataUpdate";
+                        mi.desc = "(Lnet/minecraft/network/syncher/SynchedEntityData;Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;)V";
                         modified = true;
                     }
-                } else if (minsn.getOpcode() == Opcodes.INVOKESTATIC && !isSystemPackage(minsn.owner)) {
-                    if (minsn.desc.equals("(FLnet/minecraft/world/entity/LivingEntity;)F")) {
-                        minsn.owner = ENTITY_METHODS;
-                        minsn.name = "sanitizeStaticHealth";
-                        modified = true;
-                    } else if (minsn.desc.equals("(ZLnet/minecraft/world/entity/LivingEntity;)Z")) {
-                        minsn.owner = ENTITY_METHODS;
-                        minsn.name = "sanitizeStaticDeadOrDying";
-                        modified = true;
-                    } else if (minsn.desc.equals("(ZLnet/minecraft/world/entity/Entity;)Z")) {
-                        minsn.owner = ENTITY_METHODS;
-                        minsn.name = "sanitizeStaticAlive";
+
+                    else if (mi.desc.equals("(Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;Z)V") && (mi.name.equals("set") || mi.name.startsWith("m_"))) {
+                        mi.setOpcode(INVOKESTATIC);
+                        mi.owner = METHODS;
+                        mi.name = "interceptDataUpdate";
+                        mi.desc = "(Lnet/minecraft/network/syncher/SynchedEntityData;Lnet/minecraft/network/syncher/EntityDataAccessor;Ljava/lang/Object;Z)V";
                         modified = true;
                     }
                 }
             }
+
+            else if (mi.getOpcode() == INVOKEINTERFACE && !isSys(mi.owner)) {
+                String d = mi.desc;
+                if (d.startsWith("(FLjava/lang/Object;") && d.endsWith(")F")) {
+                    modified |= redirHook(mi, "sanitizeHookHealth", "(Ljava/lang/Object;FLjava/lang/Object;Ljava/lang/Object;)F");
+                } else if (d.startsWith("(ZLjava/lang/Object;") && d.endsWith(")Z")) {
+                    String n = mi.name.toLowerCase();
+                    String target = n.contains("dead") ? "sanitizeHookDeadOrDying" : n.contains("removed") ? "sanitizeHookRemoved" : "sanitizeHookAlive";
+                    modified |= redirHook(mi, target, "(Ljava/lang/Object;ZLjava/lang/Object;Ljava/lang/Object;)Z");
+                }
+            } else if (mi.getOpcode() == INVOKESTATIC && !isSys(mi.owner)) {
+                if (mi.desc.equals("(FLnet/minecraft/world/entity/LivingEntity;)F")) modified |= redir(mi, "sanitizeStaticHealth", mi.desc);
+                else if (mi.desc.equals("(ZLnet/minecraft/world/entity/LivingEntity;)Z")) modified |= redir(mi, "sanitizeStaticDeadOrDying", mi.desc);
+                else if (mi.desc.equals("(ZLnet/minecraft/world/entity/Entity;)Z")) modified |= redir(mi, "sanitizeStaticAlive", mi.desc);
+            }
         }
         return modified;
     }
-
-    private static boolean isLivingEntityClass(String owner) {
-        return owner.equals("net/minecraft/world/entity/LivingEntity") ||
-                owner.equals("net/minecraft/world/entity/player/Player") ||
-                owner.equals("net/minecraft/server/level/ServerPlayer") ||
-                owner.equals("net/minecraft/client/player/LocalPlayer") ||
-                owner.equals("net/minecraft/world/entity/Mob");
-    }
-
-    private static boolean isAnyEntityClass(String owner) {
-        return isLivingEntityClass(owner) || owner.equals("net/minecraft/world/entity/Entity");
-    }
-
-    private static boolean isSystemPackage(String owner) {
-        return owner.startsWith("net/minecraft/") ||
-                owner.startsWith("com/mojang/") ||
-                owner.startsWith("java/") ||
-                owner.startsWith("jdk/") ||
-                owner.startsWith("net/minecraftforge/") ||
-                owner.startsWith("com/maxwell/hyperdamagelib/");
-    }
-
-    private static void injectHeadReturn(MethodNode method, String judgeName, String judgeDesc, String replaceName, String replaceDesc, int returnOpcode) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, judgeName, judgeDesc, false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, replaceName, replaceDesc, false));
-        insns.add(new InsnNode(returnOpcode));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack = Math.max(method.maxStack, 4);
-    }
-
-    private static void injectPosGuard(MethodNode method) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        insns.add(new VarInsnNode(Opcodes.DLOAD, 1));
-        insns.add(new VarInsnNode(Opcodes.DLOAD, 3));
-        insns.add(new VarInsnNode(Opcodes.DLOAD, 5));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldInterceptSetPos", "(Lnet/minecraft/world/entity/Entity;DDD)Z", false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new InsnNode(Opcodes.RETURN));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack = Math.max(method.maxStack, 8);
-    }
-
-    private static void injectRemovalGuard(MethodNode method) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldInterceptRemoval", "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/entity/Entity$RemovalReason;)Z", false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new InsnNode(Opcodes.RETURN));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack = Math.max(method.maxStack, 4);
-    }
-
-    private static void injectVoidGuard(MethodNode method) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldInterceptKill", "(Lnet/minecraft/world/entity/Entity;)Z", false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new InsnNode(Opcodes.RETURN));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack = Math.max(method.maxStack, 4);
-    }
-
-    private static void injectTickListGuard(MethodNode method) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldInterceptTickListRemove", "(Lnet/minecraft/world/entity/Entity;)Z", false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new InsnNode(Opcodes.RETURN));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack = Math.max(method.maxStack, 4);
-    }
-
-    private static void injectLookupGuard(MethodNode method) {
-        LabelNode skipLabel = new LabelNode();
-        InsnList insns = new InsnList();
-        insns.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, ENTITY_METHODS, "shouldInterceptLookupRemove", "(Ljava/lang/Object;)Z", false));
-        insns.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel));
-        insns.add(new InsnNode(Opcodes.RETURN));
-        insns.add(skipLabel);
-        insertAtRealHead(method, insns);
-        method.maxStack += 4;
-    }
-
-    private static void insertAtRealHead(MethodNode method, InsnList insns) {
-        AbstractInsnNode first = method.instructions.getFirst();
-        while (first != null && (first instanceof LabelNode || first instanceof LineNumberNode || first instanceof FrameNode)) {
-            first = first.getNext();
+    private static boolean scanFields(MethodNode mn) {
+        boolean m = false;
+        for (AbstractInsnNode insn : mn.instructions.toArray()) {
+            if (insn instanceof FieldInsnNode f && f.getOpcode() == PUTFIELD && f.owner.equals("net/minecraft/world/entity/LivingEntity")) {
+                if (f.name.equals("deathTime") || f.name.equals("f_20919_")) {
+                    injectFieldHook(mn, f, "sanitizeDeathTimeWrite", "(ILnet/minecraft/world/entity/LivingEntity;)I");
+                    m = true;
+                }
+                else if (f.name.equals("dead") || f.name.equals("f_20890_")) {
+                    injectFieldHook(mn, f, "sanitizeDeadFlagWrite", "(ZLnet/minecraft/world/entity/LivingEntity;)Z");
+                    m = true;
+                }
+            }
         }
-        if (first != null) {
-            method.instructions.insertBefore(first, insns);
+        return m;
+    }
+
+    private static void injectFieldHook(MethodNode mn, FieldInsnNode f, String name, String desc) {
+        InsnList il = new InsnList();
+        il.add(new VarInsnNode(ALOAD, 0)); 
+        il.add(new MethodInsnNode(INVOKESTATIC, METHODS, name, desc, false));
+        mn.instructions.insertBefore(f, il);
+    }
+    private static void injectReplace(MethodNode mn, String judge, String judgeDesc, String repl, String replDesc, int ret) {
+        LabelNode l = new LabelNode(); InsnList il = new InsnList();
+        il.add(new VarInsnNode(ALOAD, 0));
+        il.add(new MethodInsnNode(INVOKESTATIC, METHODS, judge, judgeDesc, false));
+        il.add(new JumpInsnNode(IFEQ, l));
+        il.add(new VarInsnNode(ALOAD, 0));
+        il.add(new MethodInsnNode(INVOKESTATIC, METHODS, repl, replDesc, false));
+        il.add(new InsnNode(ret));
+        il.add(l); insertHead(mn, il);
+    }
+    private static void injectStatic(MethodNode mn, String name, String desc) {
+        InsnList il = new InsnList();
+        il.add(new VarInsnNode(ALOAD, 0));
+        il.add(new MethodInsnNode(INVOKESTATIC, METHODS, name, desc, false));
+        insertHead(mn, il);
+    }
+    private static void injectGuard(MethodNode mn, String judge, String judgeDesc, boolean isPos) {
+        LabelNode l = new LabelNode();
+        InsnList il = new InsnList();
+
+        if (isPos) {
+            il.add(new VarInsnNode(ALOAD, 0));
+            il.add(new VarInsnNode(DLOAD, 1));
+            il.add(new VarInsnNode(DLOAD, 3));
+            il.add(new VarInsnNode(DLOAD, 5));
         } else {
-            method.instructions.add(insns);
+            il.add(new VarInsnNode(ALOAD, mn.name.equals("remove") ? 1 : 0));
+            if (judgeDesc.contains("RemovalReason") || judgeDesc.contains("Pose")) {
+                il.add(new VarInsnNode(ALOAD, 1));
+            }
         }
+
+        il.add(new MethodInsnNode(INVOKESTATIC, METHODS, judge, judgeDesc, false));
+        il.add(new JumpInsnNode(IFEQ, l));
+        il.add(new InsnNode(RETURN));
+        il.add(l);
+        insertHead(mn, il);
     }
 
-    private static boolean isMethod(MethodNode method, String obfName, String name, String desc) {
-        return (obfName.equals(method.name) || name.equals(method.name)) && desc.equals(method.desc);
+    private static void insertHead(MethodNode mn, InsnList il) {
+        AbstractInsnNode f = mn.instructions.getFirst();
+        while (f != null && (f instanceof LabelNode || f instanceof LineNumberNode || f instanceof FrameNode)) f = f.getNext();
+        if (f != null) mn.instructions.insertBefore(f, il); else mn.instructions.add(il);
     }
+
+    private static boolean redir(MethodInsnNode mi, String n, String d) { mi.setOpcode(INVOKESTATIC); mi.owner = METHODS; mi.name = n; mi.desc = d; return true; }
+    private static boolean redirHook(MethodInsnNode mi, String n, String d) { mi.setOpcode(INVOKESTATIC); mi.owner = METHODS; mi.name = n; mi.desc = d; mi.itf = false; return true; }
+    private static boolean isM(MethodNode mn, String s, String n, String d) { return (mn.name.equals(s) || mn.name.equals(n)) && mn.desc.equals(d); }
+    private static boolean isM(MethodInsnNode mi, String s, String n, String d) { return (mi.name.equals(s) || mi.name.equals(n)) && mi.desc.equals(d); }
+    private static boolean isEntity(String o) {
+
+        return o.equals("net/minecraft/world/entity/Entity") ||
+                o.equals("net/minecraft/world/entity/LivingEntity") ||
+                o.equals("net/minecraft/world/entity/Mob") ||
+                o.equals("net/minecraft/world/entity/player/Player") ||
+                o.equals("net/minecraft/server/level/ServerPlayer") ||
+                o.equals("net/minecraft/client/player/LocalPlayer");
+    }
+    private static boolean isSys(String o) { return o.startsWith("java/") || o.startsWith("net/minecraft/") || o.startsWith("net/minecraftforge/") || o.startsWith("com/maxwell/hyperdamagelib/"); }
 }

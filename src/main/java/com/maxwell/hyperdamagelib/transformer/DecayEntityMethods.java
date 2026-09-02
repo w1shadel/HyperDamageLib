@@ -2,241 +2,132 @@ package com.maxwell.hyperdamagelib.transformer;
 
 import com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
+import com.maxwell.hyperdamagelib.mixin.accessor.SynchedEntityDataAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
 public final class DecayEntityMethods {
-    private DecayEntityMethods() {
+    private DecayEntityMethods() {}
+
+    private static boolean isP(Entity e) {
+        if (e == null) return false;
+        return InvincibleHelper.isInvincible(e) || (e instanceof IDecayEntity d && d.isSuperInvincible()) || (e instanceof MeasurementDummyEntity m && !m.isRemoveBypass());
     }
 
-    public static boolean isReallyAlive(Entity entity) {
-        if (entity == null) return false;
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
-            return !InvincibleHelper.isRemoveBypass(entity);
-        }
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return !dummy.isRemoveBypass();
-        }
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
-            return false;
-        }
-        if (entity instanceof LivingEntity living) {
-            return living.getHealth() > 0.0F && living.deathTime == 0 && entity.getRemovalReason() == null;
-        }
-        return entity.getRemovalReason() == null;
+    public static boolean isReallyAlive(Entity e) {
+        if (e == null) return false;
+        if (isP(e)) return !InvincibleHelper.isRemoveBypass(e);
+        if (DecayDamageUtil.FORCE_DAMAGE.get()) return false;
+        if (e instanceof LivingEntity le) return le.getHealth() > 0.0F && le.deathTime == 0 && e.getRemovalReason() == null;
+        return e.getRemovalReason() == null;
     }
 
-    public static boolean isReallyDeadOrDying(LivingEntity entity) {
-        if (entity == null) return true;
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
-            return false;
-        }
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass();
-        }
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
-            return true;
-        }
-        return getTrueHealth(entity) <= 0.0F;
-    }
-
-    public static boolean isReallyRemoved(Entity entity) {
-        if (entity == null) return true;
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
-            return InvincibleHelper.isRemoveBypass(entity);
-        }
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass();
-        }
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
-            return true;
-        }
-        return entity.getRemovalReason() != null;
-    }
-
-    public static float sanitizeHookHealth(Object hookInstance, float incomingHealth, Object targetEntity, Object phase) {
-        if (targetEntity instanceof LivingEntity living) {
-            return getTrueHealth(living);
-        }
-        return incomingHealth;
-    }
-
-    public static boolean sanitizeHookAlive(Object hookInstance, boolean incomingBool, Object targetEntity, Object phase) {
-        if (targetEntity instanceof Entity entity) {
-            return isReallyAlive(entity);
-        }
-        return incomingBool;
-    }
-
-    public static boolean sanitizeHookDeadOrDying(Object hookInstance, boolean incomingBool, Object targetEntity, Object phase) {
-        if (targetEntity instanceof LivingEntity living) {
-            return isReallyDeadOrDying(living);
-        }
-        return incomingBool;
-    }
-
-    public static boolean sanitizeHookRemoved(Object hookInstance, boolean incomingBool, Object targetEntity, Object phase) {
-        if (targetEntity instanceof Entity entity) {
-            return isReallyRemoved(entity);
-        }
-        return incomingBool;
-    }
-
-    public static float sanitizeStaticHealth(float incomingHealth, LivingEntity entity) {
-        return getTrueHealth(entity);
-    }
-
-    public static boolean sanitizeStaticDeadOrDying(boolean incomingBool, LivingEntity entity) {
-        return isReallyDeadOrDying(entity);
-    }
-
-    public static boolean sanitizeStaticAlive(boolean incomingBool, Entity entity) {
-        return isReallyAlive(entity);
-    }
-
-    public static boolean shouldReplaceHealthMethod(Entity entity) {
-        if (DecayDamageUtil.BYPASS_DECAY.get()) return false;
-        if (entity == null) return false;
-        if (entity instanceof LivingEntity living) {
-            if (!InvincibleHelper.isInvincible(entity) &&
-                    (!(entity instanceof IDecayEntity decay) || !decay.isSuperInvincible())) {
-                float rawHp = getRawEntityDataHealth(living);
-                if (rawHp <= 0.0F || living.deathTime > 0) {
-                    return false;
-                }
-            }
-        }
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible()))
-            return true;
-        if (entity instanceof MeasurementDummyEntity) return true;
+    public static boolean isReallyDeadOrDying(LivingEntity e) {
+        if (e == null) return true;
+        if (isP(e)) return false;
         if (DecayDamageUtil.FORCE_DAMAGE.get()) return true;
-        if (entity instanceof IDecayEntity decay && decay.getDecayAmount() > 0.0F) return true;
+        return getTrueHealth(e) <= 0.0F;
+    }
+
+    public static boolean isReallyRemoved(Entity e) {
+        if (e == null) return true;
+        if (isP(e)) return InvincibleHelper.isRemoveBypass(e);
+        if (DecayDamageUtil.FORCE_DAMAGE.get()) return true;
+        return e.getRemovalReason() != null;
+    }
+
+    public static float getTrueHealth(LivingEntity e) {
+        if (e == null) return 0.0F;
+        if (isP(e)) return (e instanceof IDecayEntity d) ? d.getInvincibleHealthValue() : getRawHp(e);
+        if (DecayDamageUtil.FORCE_DAMAGE.get()) return -Float.MAX_VALUE;
+        float max = Math.max(20.0f, e.getMaxHealth());
+        float decay = (e instanceof IDecayEntity d) ? d.getDecayAmount() : 0.0f;
+        return (decay >= max) ? -Float.MAX_VALUE : Math.max(0.0f, Math.min(getRawHp(e), max - decay));
+    }
+
+    public static boolean shouldReplaceHealthMethod(Entity e) {
+        if (DecayDamageUtil.BYPASS_DECAY.get() || e == null) return false;
+
+        if (isP(e)) return true;
+        if (e instanceof LivingEntity le) {
+            return getTrueHealth(le) > 0.0F; 
+        }
         return false;
     }
 
-    public static float getTrueHealth(LivingEntity entity) {
-        if (entity == null) return 0.0F;
-        if (InvincibleHelper.isInvincible(entity) || (entity instanceof IDecayEntity decay && decay.isSuperInvincible())) {
-            if (entity instanceof IDecayEntity decay) {
-                return decay.getInvincibleHealthValue();
+    public static float sanitizeHookHealth(Object inst, float val, Object ent, Object p) { return (ent instanceof LivingEntity le) ? getTrueHealth(le) : val; }
+    public static boolean sanitizeHookAlive(Object inst, boolean val, Object ent, Object p) { return (ent instanceof Entity e) ? isReallyAlive(e) : val; }
+    public static boolean sanitizeHookDeadOrDying(Object inst, boolean val, Object ent, Object p) { return (ent instanceof LivingEntity le) ? isReallyDeadOrDying(le) : val; }
+    public static boolean sanitizeHookRemoved(Object inst, boolean val, Object ent, Object p) { return (ent instanceof Entity e) ? isReallyRemoved(e) : val; }
+    public static boolean shouldInterceptTickDeath(LivingEntity e) {
+        return isP(e) || getTrueHealth(e) > 0.0F;
+    }
+    public static int sanitizeDeathTimeWrite(int val, LivingEntity e) {
+        return (isP(e) || getTrueHealth(e) > 0.0F) ? 0 : val;
+    }
+    public static boolean sanitizeDeadFlagWrite(boolean val, LivingEntity e) {
+        return (isP(e) || getTrueHealth(e) > 0.0F) ? false : val;
+    }
+    public static float sanitizeStaticHealth(float val, LivingEntity e) { return getTrueHealth(e); }
+    public static boolean sanitizeStaticDeadOrDying(boolean val, LivingEntity e) { return isReallyDeadOrDying(e); }
+    public static boolean sanitizeStaticAlive(boolean val, Entity e) { return isReallyAlive(e); }
+    public static void interceptKillCall(Entity e) { if (!isP(e)) e.kill(); }
+    public static void interceptDiscardCall(Entity e) { if (!isP(e)) e.discard(); }
+    public static boolean shouldInterceptDie(LivingEntity entity) {
+        return isP(entity);
+    }
+    public static void forceStateSync(LivingEntity entity) {
+        if (isP(entity)) {
+            entity.deathTime = 0;
+            entity.dead = false;
+            if (entity.getHealth() <= 0.01f) {
+                entity.setHealth(entity.getMaxHealth());
             }
-            return getRawEntityDataHealth(entity);
-        }
-        if (entity instanceof MeasurementDummyEntity dummy) {
-            return dummy.isRemoveBypass() ? 0.0F : dummy.getMaxHealth();
-        }
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
-            return -Float.MAX_VALUE;
-        }
-        float maxHp = entity.getMaxHealth();
-        if (Float.isNaN(maxHp) || maxHp <= 0.0F) maxHp = 20.0F;
-        float decayAmount = (entity instanceof IDecayEntity decay) ? decay.getDecayAmount() : 0.0F;
-        if (decayAmount >= maxHp) {
-            return -Float.MAX_VALUE;
-        }
-        float rawHealth = getRawEntityDataHealth(entity);
-        float cappedMax = Math.max(0.0F, maxHp - decayAmount);
-        return Math.max(0.0F, Math.min(rawHealth, cappedMax));
-    }
-
-    public static float replaceGetHealth(LivingEntity entity) {
-        return getTrueHealth(entity);
-    }
-
-    public static boolean replaceIsAlive(Entity entity) {
-        return isReallyAlive(entity);
-    }
-
-    public static boolean replaceIsDeadOrDying(Entity entity) {
-        if (entity instanceof LivingEntity living) return isReallyDeadOrDying(living);
-        return false;
-    }
-
-    public static boolean shouldReplaceIsPickable(Entity entity) {
-        return isProtected(entity);
-    }
-
-    public static boolean replaceIsPickable(Entity entity) {
-        return !isProtected(entity);
-    }
-
-    public static boolean shouldReplaceIsAttackable(Entity entity) {
-        return isProtected(entity);
-    }
-
-    public static boolean replaceIsAttackable(Entity entity) {
-        return !isProtected(entity);
-    }
-
-    public static boolean shouldReplaceCanBeHitByProjectile(Entity entity) {
-        return isProtected(entity);
-    }
-
-    public static boolean replaceCanBeHitByProjectile(Entity entity) {
-        return !isProtected(entity);
-    }
-
-    public static boolean shouldInterceptSetPos(Entity entity, double x, double y, double z) {
-        if (isProtected(entity)) {
-            return Double.isNaN(x) || Double.isNaN(y) || Double.isNaN(z) ||
-                    Double.isInfinite(x) || Double.isInfinite(y) || Double.isInfinite(z) ||
-                    Math.abs(x) > 29999984.0D || Math.abs(z) > 29999984.0D || Math.abs(y) > 20000000.0D;
-        }
-        return false;
-    }
-
-    public static boolean shouldInterceptRemoval(Entity entity, Entity.RemovalReason reason) {
-        if (entity == null || reason == null) return false;
-        if (reason == Entity.RemovalReason.DISCARDED ||
-                reason == Entity.RemovalReason.CHANGED_DIMENSION ||
-                reason == Entity.RemovalReason.UNLOADED_WITH_PLAYER ||
-                reason == Entity.RemovalReason.UNLOADED_TO_CHUNK) {
-            return false;
-        }
-        if (InvincibleHelper.isRemoveBypass(entity)) return false;
-        if (entity instanceof MeasurementDummyEntity dummy && dummy.isRemoveBypass()) return false;
-        return isProtected(entity);
-    }
-
-    public static boolean shouldInterceptKill(Entity entity) {
-        if (entity == null) return false;
-        if (InvincibleHelper.isRemoveBypass(entity)) return false;
-        if (entity instanceof MeasurementDummyEntity dummy && dummy.isRemoveBypass()) return false;
-        return isProtected(entity);
-    }
-
-    public static boolean shouldInterceptTickListRemove(Entity entity) {
-        if (entity == null) return false;
-        if (InvincibleHelper.isRemoveBypass(entity)) return false;
-        if (entity instanceof MeasurementDummyEntity dummy && dummy.isRemoveBypass()) return false;
-        return isProtected(entity);
-    }
-
-    public static boolean shouldInterceptLookupRemove(Object obj) {
-        if (obj instanceof Entity entity) {
-            if (InvincibleHelper.isRemoveBypass(entity)) return false;
-            if (entity instanceof MeasurementDummyEntity dummy && dummy.isRemoveBypass()) return false;
-            return isProtected(entity);
-        }
-        return false;
-    }
-
-    private static boolean isProtected(Entity entity) {
-        if (entity == null) return false;
-        return InvincibleHelper.isInvincible(entity) ||
-                (entity instanceof IDecayEntity decay && decay.isSuperInvincible()) ||
-                (entity instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass());
-    }
-
-    private static float getRawEntityDataHealth(LivingEntity entity) {
-        try {
-            Float val = entity.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-            return (val != null && !Float.isNaN(val)) ? val : entity.getMaxHealth();
-        } catch (Throwable t) {
-            return entity.getMaxHealth();
         }
     }
+
+    public static void interceptDataUpdate(net.minecraft.network.syncher.SynchedEntityData data, net.minecraft.network.syncher.EntityDataAccessor<?> accessor, Object value) {
+        interceptDataUpdate(data, accessor, value, false);
+    }
+    public static boolean shouldInterceptSetPose(Entity e, net.minecraft.world.entity.Pose pose) {
+        return isP(e) && pose == net.minecraft.world.entity.Pose.DYING;
+    }
+    public static void interceptDataUpdate(net.minecraft.network.syncher.SynchedEntityData data, net.minecraft.network.syncher.EntityDataAccessor<?> accessor, Object value, boolean force) {
+        if (accessor.equals(LivingEntity.DATA_HEALTH_ID) && value instanceof Float f && f <= 0.0f) {
+            net.minecraft.world.entity.Entity rawEntity = ((com.maxwell.hyperdamagelib.mixin.accessor.SynchedEntityDataAccessor) data).getEntity();
+            if (rawEntity instanceof LivingEntity owner && isP(owner)) {
+                data.set((net.minecraft.network.syncher.EntityDataAccessor<Float>) accessor, owner.getMaxHealth(), force);
+                return;
+            }
+        }
+        data.set((net.minecraft.network.syncher.EntityDataAccessor<Object>) accessor, value, force);
+    }
+    public static boolean shouldInterceptSetPos(Entity e, double x, double y, double z) {
+        if (!isP(e)) return false;
+        return Double.isNaN(x) || Double.isInfinite(x) || Math.abs(x) > 29999984.0D || Math.abs(z) > 29999984.0D || Math.abs(y) > 20000000.0D;
+    }
+    public static boolean shouldInterceptRemoval(Entity e, Entity.RemovalReason r) {
+        if (e == null || r == null || InvincibleHelper.isRemoveBypass(e)) return false;
+        if (r == Entity.RemovalReason.DISCARDED || r == Entity.RemovalReason.CHANGED_DIMENSION || r == Entity.RemovalReason.UNLOADED_WITH_PLAYER || r == Entity.RemovalReason.UNLOADED_TO_CHUNK) return false;
+        return isP(e);
+    }
+    public static boolean shouldInterceptKill(Entity e) { return isP(e) && !InvincibleHelper.isRemoveBypass(e); }
+    public static boolean shouldInterceptTickListRemove(Entity e) { return shouldInterceptKill(e); }
+    public static boolean shouldInterceptLookupRemove(Object o) { return (o instanceof Entity e) && shouldInterceptKill(e); }
+
+    private static float getRawHp(LivingEntity e) { try { return e.getEntityData().get(LivingEntityAccessor.getDataHealthId()); } catch (Throwable t) { return e.getMaxHealth(); } }
+    public static float replaceGetHealth(LivingEntity e) { return getTrueHealth(e); }
+    public static boolean replaceIsAlive(Entity e) { return isReallyAlive(e); }
+    public static boolean replaceIsDeadOrDying(Entity e) { return (e instanceof LivingEntity le) && isReallyDeadOrDying(le); }
+    public static boolean replaceIsPickable(Entity e) { return !isP(e); }
+    public static boolean replaceIsAttackable(Entity e) { return !isP(e); }
+    public static boolean replaceCanBeHitByProjectile(Entity e) { return !isP(e); }
+    public static boolean shouldReplaceIsPickable(Entity e) { return isP(e); }
+    public static boolean shouldReplaceIsAttackable(Entity e) { return isP(e); }
+    public static boolean shouldReplaceCanBeHitByProjectile(Entity e) { return isP(e); }
 }
