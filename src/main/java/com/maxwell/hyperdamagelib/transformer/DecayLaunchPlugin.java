@@ -44,6 +44,6 @@ public class DecayLaunchPlugin implements ILaunchPluginService {
         } catch (Throwable t) {
             return ComputeFlags.NO_REWRITE;
         }
-        return modified ? ComputeFlags.SIMPLE_REWRITE : ComputeFlags.NO_REWRITE;
+        return modified ? ComputeFlags.COMPUTE_FRAMES : ComputeFlags.NO_REWRITE;
     }
 }
