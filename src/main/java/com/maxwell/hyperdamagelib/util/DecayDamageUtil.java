@@ -82,14 +82,14 @@ public final class DecayDamageUtil {
             return;
         }
         if (InvincibleHelper.isInvincible(target)) return;
+
         LivingEntityAccessor livAcc = (LivingEntityAccessor) target;
         EntityAccessor entAcc = (EntityAccessor) target;
-        boolean isErosion = source.is(ModDamageTypes.EROSION);
-        boolean isPenetrate = source.is(ModDamageTypes.PENETRATE);
+
         float finalDamage = rawAmount;
         float targetMaxHp = (float) target.getAttributeValue(Attributes.MAX_HEALTH);
         if (Float.isNaN(targetMaxHp) || targetMaxHp <= 0.0F) targetMaxHp = 20.0F;
-        if (isPenetrate) {
+        if (source.is(ModDamageTypes.PENETRATE)) {
             int invTime = entAcc.getInvulnerableTime();
             float lastHurt = livAcc.getLastHurt();
             if (invTime > 10) {
@@ -101,50 +101,39 @@ public final class DecayDamageUtil {
                 entAcc.setInvulnerableTime(20);
                 target.hurtTime = 10;
             }
+
             float armor = Math.min(30.0F, (float) target.getArmorValue());
             float toughness = Math.min(20.0F, (float) target.getAttributeValue(Attributes.ARMOR_TOUGHNESS));
             finalDamage = CombatRules.getDamageAfterAbsorb(finalDamage, armor, toughness);
+
             if (target.hasEffect(MobEffects.DAMAGE_RESISTANCE)) {
                 int amp = Math.min(3, target.getEffect(MobEffects.DAMAGE_RESISTANCE).getAmplifier());
                 finalDamage *= Math.max(0.20F, 1.0F - (amp + 1) * 0.20F);
             }
-        } else if (isErosion) {
+        } else if (source.is(ModDamageTypes.EROSION)) {
             finalDamage = rawAmount;
-            if (target instanceof IDecayEntity decayTarget) {
-                decayTarget.addDecayAmount(finalDamage);
-            }
         }
+
         if (finalDamage <= 0.0F) return;
+
         try {
             BYPASS_DECAY.set(true);
             float currentHealth = target.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-            if (Float.isNaN(currentHealth)) currentHealth = targetMaxHp;
-            float decayAmount = (target instanceof IDecayEntity decay) ? decay.getDecayAmount() : 0.0F;
-            float cappedMaxHealth = Math.max(0.0F, targetMaxHp - decayAmount);
-            float nextHealth = Math.min(cappedMaxHealth, Math.max(0.0F, currentHealth - finalDamage));
+            if (Float.isNaN(currentHealth)) currentHealth = target.getHealth();
+
+            float nextHealth = Math.max(0.0F, currentHealth - finalDamage);
             target.setHealth(nextHealth);
             sendDirectDataPacket(target, nextHealth);
-            if (target instanceof IDecayEntity decayTarget) {
-                ModMessages.INSTANCE.send(
-                        PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> target),
-                        new ClientboundDecaySyncPacket(
-                                target.getId(),
-                                decayTarget.getDecayAmount(),
-                                decayTarget.isSuperInvincible(),
-                                decayTarget.isKeepCurrentHealth(),
-                                decayTarget.getInvincibleHealthValue(),
-                                decayTarget.isHealBlocked()
-                        )
-                );
-            }
+
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
-            if (nextHealth <= 0.0F || (decayAmount >= targetMaxHp && targetMaxHp > 0.0F)) {
+            if (nextHealth <= 0.0F) {
                 boolean hasTotem = false;
                 try {
                     hasTotem = livAcc.invokeCheckTotemDeathProtection(source);
                 } catch (Throwable ignored) {
                 }
+
                 if (!hasTotem) {
                     if (target instanceof ServerPlayer sp && sp.connection != null) {
                         sp.connection.send(new ClientboundPlayerCombatKillPacket(sp.getId(), sp.getCombatTracker().getDeathMessage()));
@@ -163,6 +152,7 @@ public final class DecayDamageUtil {
                 } catch (Throwable ignored) {
                 }
             }
+
             livAcc.setLastDamageSource(source);
             livAcc.setLastDamageStamp(target.level().getGameTime());
 

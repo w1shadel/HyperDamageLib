@@ -54,7 +54,6 @@ public abstract class ClientPacketListenerMixin {
             InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(mc.player.getUUID());
             if (mc.player instanceof IDecayEntity decay) {
                 decay.setSuperInvincible(false);
-                decay.setDecayAmount(0.0F);
             }
         }
     }

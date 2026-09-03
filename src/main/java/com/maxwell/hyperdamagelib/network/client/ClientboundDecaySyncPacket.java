@@ -6,7 +6,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.network.NetworkEvent;
@@ -15,15 +14,13 @@ import java.util.function.Supplier;
 
 public class ClientboundDecaySyncPacket {
     private final int entityId;
-    private final float decayAmount;
     private final boolean superInvincible;
     private final boolean keepCurrentHealth;
     private final float invincibleHealthValue;
     private final boolean healBlocked;
 
-    public ClientboundDecaySyncPacket(int entityId, float decayAmount, boolean superInvincible, boolean keepCurrentHealth, float invincibleHealthValue, boolean healBlocked) {
+    public ClientboundDecaySyncPacket(int entityId, boolean superInvincible, boolean keepCurrentHealth, float invincibleHealthValue, boolean healBlocked) {
         this.entityId = entityId;
-        this.decayAmount = decayAmount;
         this.superInvincible = superInvincible;
         this.keepCurrentHealth = keepCurrentHealth;
         this.invincibleHealthValue = invincibleHealthValue;
@@ -32,7 +29,6 @@ public class ClientboundDecaySyncPacket {
 
     public static void encode(ClientboundDecaySyncPacket msg, FriendlyByteBuf buf) {
         buf.writeInt(msg.entityId);
-        buf.writeFloat(msg.decayAmount);
         buf.writeBoolean(msg.superInvincible);
         buf.writeBoolean(msg.keepCurrentHealth);
         buf.writeFloat(msg.invincibleHealthValue);
@@ -42,7 +38,6 @@ public class ClientboundDecaySyncPacket {
     public static ClientboundDecaySyncPacket decode(FriendlyByteBuf buf) {
         return new ClientboundDecaySyncPacket(
                 buf.readInt(),
-                buf.readFloat(),
                 buf.readBoolean(),
                 buf.readBoolean(),
                 buf.readFloat(),
@@ -65,18 +60,13 @@ public class ClientboundDecaySyncPacket {
         if (mc.level != null) {
             Entity entity = mc.level.getEntity(this.entityId);
             if (entity instanceof IDecayEntity decay) {
-                decay.setDecayAmount(this.decayAmount);
                 decay.setKeepCurrentHealth(this.keepCurrentHealth);
                 decay.setInvincibleHealthValue(this.invincibleHealthValue);
                 decay.setSuperInvincible(this.superInvincible);
                 decay.setHealBlocked(this.healBlocked);
                 InvincibleHelper.setInvincible(entity, this.superInvincible);
                 if (this.superInvincible && entity instanceof LivingEntity living) {
-                    living.dead = false;
-                    living.deathTime = 0;
-                    if (living.getPose() == Pose.DYING) {
-                        living.setPose(Pose.STANDING);
-                    }
+                    InvincibleHelper.keepAlive(living);
                 }
             }
         }

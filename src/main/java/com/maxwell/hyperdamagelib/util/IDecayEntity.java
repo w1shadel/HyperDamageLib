@@ -1,71 +1,18 @@
 package com.maxwell.hyperdamagelib.util;
 
-import net.minecraft.world.damagesource.DamageSource;
-
 public interface IDecayEntity {
-    default float getDecayAmount() {
-        return 0.0F;
-    }
+    boolean isSuperInvincible();
+    void setSuperInvincible(boolean val);
 
-    default void setDecayAmount(float amount) {
-    }
+    boolean isRemoveBypass();
+    void setRemoveBypass(boolean val);
 
-    default void addDecayAmount(float amount) {
-    }
+    boolean isKeepCurrentHealth();
+    void setKeepCurrentHealth(boolean val);
 
-    default boolean isSuperInvincible() {
-        return false;
-    }
+    float getInvincibleHealthValue();
+    void setInvincibleHealthValue(float val);
 
-    default void setSuperInvincible(boolean val) {
-    }
-
-    default boolean isRemoveBypass() {
-        return false;
-    }
-
-    default void setRemoveBypass(boolean val) {
-    }
-
-    default void subtractTrueHP(float amount) {
-    }
-
-    default int getDecayHoldTicks() {
-        return 0;
-    }
-
-    default void setDecayHoldTicks(int ticks) {
-    }
-
-    default boolean isKeepCurrentHealth() {
-        return false;
-    }
-
-    default void setKeepCurrentHealth(boolean val) {
-    }
-
-    default float getInvincibleHealthValue() {
-        return 20.0F;
-    }
-
-    default void setInvincibleHealthValue(float val) {
-    }
-
-    default boolean isHealBlocked() {
-        return false;
-    }
-
-    default void setHealBlocked(boolean val) {
-    }
-
-    default boolean isDamageTestDummy() {
-        return false;
-    }
-
-    default void recordMeasurementDamage(DamageSource source, float amount) {
-    }
-
-    default boolean isIntangible() {
-        return false;
-    }
+    boolean isHealBlocked();
+    void setHealBlocked(boolean val);
 }

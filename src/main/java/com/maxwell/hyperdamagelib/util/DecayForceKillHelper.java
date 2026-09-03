@@ -23,9 +23,7 @@ public class DecayForceKillHelper {
         try {
             DecayDamageUtil.FORCE_DAMAGE.set(true);
             breakBrain(entity);
-            if (entity instanceof IDecayEntity decay) {
-                decay.setDecayAmount(entity.getMaxHealth() * 2.0F);
-            }
+
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 entity.setHealth(0.0F);
@@ -33,13 +31,13 @@ public class DecayForceKillHelper {
             } finally {
                 DecayDamageUtil.BYPASS_DECAY.remove();
             }
+
             DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
             entity.die(erosion);
             dropAllForce(entity);
+
             if (!(entity instanceof Player)) {
-                if (entity instanceof IDecayEntity decay) {
-                    decay.setRemoveBypass(true);
-                }
+                InvincibleHelper.setRemoveBypass(entity, true);
                 entity.remove(Entity.RemovalReason.KILLED);
                 entity.discard();
                 removeFromMemory(entity);

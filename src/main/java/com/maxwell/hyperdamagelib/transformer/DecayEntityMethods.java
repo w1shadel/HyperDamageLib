@@ -3,7 +3,6 @@ package com.maxwell.hyperdamagelib.transformer;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.mixin.accessor.SynchedEntityDataAccessor;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -15,8 +14,7 @@ public final class DecayEntityMethods {
     }
 
     public static boolean isP(Entity e) {
-        if (e == null) return false;
-        return InvincibleHelper.isInvincible(e) || (e instanceof IDecayEntity d && d.isSuperInvincible());
+        return InvincibleHelper.isInvincible(e);
     }
 
     public static boolean isReallyAlive(Entity e) {
@@ -53,11 +51,13 @@ public final class DecayEntityMethods {
 
     public static float getTrueHealth(LivingEntity e) {
         if (e == null) return 0.0F;
-        if (isP(e)) return (e instanceof IDecayEntity d) ? d.getInvincibleHealthValue() : getRawHp(e);
-        if (DecayDamageUtil.FORCE_DAMAGE.get()) return -Float.MAX_VALUE;
-        float max = Math.max(20.0f, e.getMaxHealth());
-        float decay = (e instanceof IDecayEntity d) ? d.getDecayAmount() : 0.0f;
-        return (decay >= max) ? -Float.MAX_VALUE : Math.max(0.0f, Math.min(getRawHp(e), max - decay));
+        if (isP(e)) {
+            return InvincibleHelper.getInvincibleHealth(e);
+        }
+        if (DecayDamageUtil.FORCE_DAMAGE.get()) {
+            return -Float.MAX_VALUE;
+        }
+        return getRawHp(e);
     }
 
     public static boolean shouldReplaceHealthMethod(Entity e) {
@@ -123,8 +123,7 @@ public final class DecayEntityMethods {
 
     public static void forceStateSync(LivingEntity entity) {
         if (isP(entity)) {
-            entity.deathTime = 0;
-            entity.dead = false;
+            InvincibleHelper.keepAlive(entity);
             if (entity.getHealth() <= 0.01f) {
                 entity.setHealth(entity.getMaxHealth());
             }
@@ -140,7 +139,7 @@ public final class DecayEntityMethods {
     }
 
     public static void interceptDataUpdate(SynchedEntityData data, EntityDataAccessor<?> accessor, Object value, boolean force) {
-        if (accessor.equals(LivingEntity.DATA_HEALTH_ID) && value instanceof Float f && f <= 0.0f) {
+        if (accessor.equals(LivingEntityAccessor.getDataHealthId()) && value instanceof Float f && f <= 0.0f) {
             Entity rawEntity = ((SynchedEntityDataAccessor) data).getEntity();
             if (rawEntity instanceof LivingEntity owner && isP(owner)) {
                 data.set((EntityDataAccessor<Float>) accessor, owner.getMaxHealth(), force);
@@ -200,7 +199,7 @@ public final class DecayEntityMethods {
     }
 
     public static boolean shouldReplaceIsPickable(Entity entity) {
-        return entity instanceof IDecayEntity decay && decay.isIntangible();
+        return false;
     }
 
     public static boolean replaceIsPickable(Entity e) {
@@ -208,7 +207,7 @@ public final class DecayEntityMethods {
     }
 
     public static boolean shouldReplaceIsAttackable(Entity entity) {
-        return entity instanceof IDecayEntity decay && decay.isIntangible();
+        return false;
     }
 
     public static boolean replaceIsAttackable(Entity e) {
@@ -216,7 +215,7 @@ public final class DecayEntityMethods {
     }
 
     public static boolean shouldReplaceCanBeHitByProjectile(Entity entity) {
-        return entity instanceof IDecayEntity decay && decay.isIntangible();
+        return false;
     }
 
     public static boolean replaceCanBeHitByProjectile(Entity e) {

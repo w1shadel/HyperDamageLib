@@ -1,7 +1,5 @@
 package com.maxwell.hyperdamagelib.mixin;
 
-import com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity;
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
@@ -13,13 +11,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(Entity.class)
 public abstract class EntityMixin {
-    @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
-    private void decay$isPickable(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
-            cir.setReturnValue(false);
-            cir.cancel();
-        }
-    }
 
     @Inject(method = "saveWithoutId", at = @At("HEAD"))
     public void saveWithoutIdMixin(CompoundTag pCompound, CallbackInfoReturnable<CompoundTag> cir) {
@@ -34,46 +25,24 @@ public abstract class EntityMixin {
         Entity entity = (Entity) (Object) this;
         if (compoundTag.getBoolean("hyperdamagelib:super_invincible")) {
             InvincibleHelper.setInvincible(entity, true);
-            if (entity instanceof IDecayEntity decay) {
-                decay.setSuperInvincible(true);
-            }
-        }
-    }
-
-    @Inject(method = "isAttackable", at = @At("HEAD"), cancellable = true)
-    private void decay$isAttackable(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
-            cir.setReturnValue(false);
-            cir.cancel();
-        }
-    }
-
-    @Inject(method = "canBeHitByProjectile", at = @At("HEAD"), cancellable = true)
-    private void decay$canBeHitByProjectile(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
-            cir.setReturnValue(false);
-            cir.cancel();
         }
     }
 
     @Inject(method = "kill", at = @At("HEAD"), cancellable = true)
     private void decay$preventKill(CallbackInfo ci) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-            ci.cancel();
-        }
-        if ((Object) this instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) {
+        Entity entity = (Entity) (Object) this;
+        if (InvincibleHelper.isInvincible(entity) || (InvincibleHelper.isDummy(entity) && !InvincibleHelper.isRemoveBypass(entity))) {
             ci.cancel();
         }
     }
 
     @Inject(method = "setRemoved", at = @At("HEAD"), cancellable = true)
     private void decay$preventRemoval(Entity.RemovalReason reason, CallbackInfo ci) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
-            if (!decay.isRemoveBypass()) {
-                ci.cancel();
-            }
+        Entity entity = (Entity) (Object) this;
+        if (InvincibleHelper.isRemoveBypass(entity)) {
+            return;
         }
-        if ((Object) this instanceof MeasurementDummyEntity dummy && !dummy.isRemoveBypass()) {
+        if (InvincibleHelper.isInvincible(entity) || InvincibleHelper.isDummy(entity)) {
             ci.cancel();
         }
     }

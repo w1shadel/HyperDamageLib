@@ -43,7 +43,6 @@ public class DummyControllerItem extends Item {
         if (target instanceof MeasurementDummyEntity dummy) {
             if (player.isShiftKeyDown()) {
                 dummy.setRemoveBypass(true);
-                com.maxwell.hyperdamagelib.util.DummyWatchdog.ACTIVE_DUMMIES.remove(dummy.getUUID());
                 for (EquipmentSlot slot : EquipmentSlot.values()) {
                     ItemStack eq = dummy.getItemBySlot(slot);
                     if (!eq.isEmpty()) {
@@ -58,7 +57,6 @@ public class DummyControllerItem extends Item {
                 player.displayClientMessage(Component.translatable("message.hyperdamagelib.dummy.recovered"), true);
                 return InteractionResult.SUCCESS;
             } else {
-                dummy.forceResetStats();
                 player.displayClientMessage(Component.translatable("message.hyperdamagelib.dummy.reset"), true);
                 return InteractionResult.SUCCESS;
             }

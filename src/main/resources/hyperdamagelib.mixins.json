@@ -19,9 +19,7 @@
     "client.ClientPacketListenerMixin",
     "client.ItemRendererMixin",
     "client.ItemTransformMixin",
-    "client.MinecraftMixin",
-    "client.PostChainAccessor",
-    "client.PostPassAccessor"
+    "client.MinecraftMixin"
   ],
   "injectors": {
     "defaultRequire": 1

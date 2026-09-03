@@ -5,7 +5,9 @@ import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
 import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import org.spongepowered.asm.mixin.Mixin;
@@ -18,70 +20,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = LivingEntity.class, priority = -10000000)
 public abstract class LivingEntityMixin implements IDecayEntity {
-    @Shadow
-    protected boolean dead;
-    @Shadow
-    protected int deathTime;
-    @Unique
-    private float decayAmount = 0.0f;
-    @Unique
-    private boolean superInvincible = false;
-    @Unique
-    private boolean decayRemoveBypass = false;
-    @Unique
-    private int decayHoldTicks;
-    @Unique
-    private boolean keepCurrentHealth = false;
-    @Unique
-    private float invincibleHealthValue = 20.0f;
-    @Unique
-    private boolean healBlocked = false;
+    @Shadow protected boolean dead;
+    @Shadow protected int deathTime;
 
-    @Override
-    public int getDecayHoldTicks() {
-        return this.decayHoldTicks;
-    }
+    @Unique private boolean superInvincible = false;
+    @Unique private boolean decayRemoveBypass = false;
+    @Unique private boolean keepCurrentHealth = false;
+    @Unique private float invincibleHealthValue = 20.0f;
+    @Unique private boolean healBlocked = false;
 
-    @Override
-    public void setDecayHoldTicks(int ticks) {
-        this.decayHoldTicks = ticks;
-    }
+    @Override public boolean isHealBlocked() { return this.healBlocked; }
+    @Override public void setHealBlocked(boolean val) { this.healBlocked = val; decay$syncToTracking(); }
 
-    @Override
-    public float getDecayAmount() {
-        return this.decayAmount;
-    }
-
-    @Override
-    public void setDecayAmount(float amount) {
-        LivingEntity self = (LivingEntity) (Object) this;
-        float originalMax = (float) self.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH);
-        if (Float.isNaN(originalMax) || originalMax <= 0.0F) originalMax = 20.0F;
-        this.decayAmount = Math.max(0.0f, Math.min(amount, originalMax));
-        decay$syncToTracking();
-    }
-
-    @Override
-    public void addDecayAmount(float amount) {
-        this.setDecayAmount(this.decayAmount + amount);
-        this.decayHoldTicks = 100;
-    }
-
-    @Override
-    public boolean isHealBlocked() {
-        return this.healBlocked;
-    }
-
-    @Override
-    public void setHealBlocked(boolean val) {
-        this.healBlocked = val;
-        decay$syncToTracking();
-    }
-
-    @Override
-    public boolean isSuperInvincible() {
-        return this.superInvincible;
-    }
+    @Override public boolean isSuperInvincible() { return this.superInvincible; }
 
     @Override
     public void setSuperInvincible(boolean val) {
@@ -97,9 +48,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             this.invincibleHealthValue = currentHp;
             this.superInvincible = true;
             self.setInvulnerable(true);
-            this.dead = false;
-            this.deathTime = 0;
-            self.setPose(Pose.STANDING);
+            InvincibleHelper.keepAlive(self);
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 self.setHealth(this.invincibleHealthValue);
@@ -111,11 +60,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
             this.superInvincible = false;
             self.setInvulnerable(false);
             this.keepCurrentHealth = false;
-            this.decayAmount = 0.0F;
-            this.decayHoldTicks = 0;
-            this.dead = false;
-            this.deathTime = 0;
-            self.setPose(Pose.STANDING);
+            InvincibleHelper.keepAlive(self);
             try {
                 DecayDamageUtil.BYPASS_DECAY.set(true);
                 float targetHp = this.invincibleHealthValue > 0.0F ? this.invincibleHealthValue : self.getMaxHealth();
@@ -128,35 +73,14 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         decay$syncToTracking();
     }
 
-    @Override
-    public boolean isKeepCurrentHealth() {
-        return this.keepCurrentHealth;
-    }
+    @Override public boolean isKeepCurrentHealth() { return this.keepCurrentHealth; }
+    @Override public void setKeepCurrentHealth(boolean val) { this.keepCurrentHealth = val; }
 
-    @Override
-    public void setKeepCurrentHealth(boolean val) {
-        this.keepCurrentHealth = val;
-    }
+    @Override public float getInvincibleHealthValue() { return this.invincibleHealthValue; }
+    @Override public void setInvincibleHealthValue(float val) { this.invincibleHealthValue = val; }
 
-    @Override
-    public float getInvincibleHealthValue() {
-        return this.invincibleHealthValue;
-    }
-
-    @Override
-    public void setInvincibleHealthValue(float val) {
-        this.invincibleHealthValue = val;
-    }
-
-    @Override
-    public boolean isRemoveBypass() {
-        return this.decayRemoveBypass;
-    }
-
-    @Override
-    public void setRemoveBypass(boolean val) {
-        this.decayRemoveBypass = val;
-    }
+    @Override public boolean isRemoveBypass() { return this.decayRemoveBypass; }
+    @Override public void setRemoveBypass(boolean val) { this.decayRemoveBypass = val; }
 
     @Unique
     private void decay$syncToTracking() {
@@ -164,16 +88,14 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (self.level() != null && !self.level().isClientSide()) {
             ModMessages.INSTANCE.send(
                     net.minecraftforge.network.PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> self),
-                    new ClientboundDecaySyncPacket(self.getId(), this.decayAmount, this.superInvincible, this.keepCurrentHealth, this.invincibleHealthValue, this.healBlocked)
+                    new ClientboundDecaySyncPacket(self.getId(), this.superInvincible, this.keepCurrentHealth, this.invincibleHealthValue, this.healBlocked)
             );
         }
     }
 
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
     private void decay$lockHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
-        if (this.isDamageTestDummy()) {
-            return;
-        }
+        if (InvincibleHelper.isDummy((Entity) (Object) this)) return;
         if (this.superInvincible) {
             cir.setReturnValue(false);
             cir.cancel();
@@ -185,7 +107,6 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         if (this.superInvincible) {
             ci.cancel();
         }
-
     }
 
     @Inject(method = "setHealth", at = @At("HEAD"), cancellable = true)
@@ -200,10 +121,7 @@ public abstract class LivingEntityMixin implements IDecayEntity {
         LivingEntity self = (LivingEntity) (Object) this;
         if (this.superInvincible) {
             if (this.dead || this.deathTime > 0 || ((LivingEntityAccessor) self).isDeadFlag()) {
-                this.dead = false;
-                ((LivingEntityAccessor) self).setDeadFlag(false);
-                this.deathTime = 0;
-                self.setPose(Pose.STANDING);
+                InvincibleHelper.keepAlive(self);
             }
             Float rawHp = self.getEntityData().get(LivingEntityAccessor.getDataHealthId());
             if (rawHp == null || rawHp != this.invincibleHealthValue || rawHp <= 0.0F) {

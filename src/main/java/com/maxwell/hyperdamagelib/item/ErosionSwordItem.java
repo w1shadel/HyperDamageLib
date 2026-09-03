@@ -83,8 +83,6 @@ public class ErosionSwordItem extends SwordItem {
                         try {
                             DecayDamageUtil.BYPASS_DECAY.set(true);
                             player.setHealth(decay.getInvincibleHealthValue());
-                            decay.setDecayAmount(0.0F);
-                            decay.setDecayHoldTicks(0);
                             player.dead = false;
                             player.deathTime = 0;
                         } finally {

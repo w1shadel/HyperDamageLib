@@ -1,11 +1,9 @@
 package com.maxwell.hyperdamagelib.client.util;
 
 import com.maxwell.hyperdamagelib.HDL;
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -27,23 +25,14 @@ public class DecayClientEventHandler {
         LocalPlayer player = mc.player;
         if (player == null || mc.level == null) return;
         if (InvincibleHelper.isInvincible(player)) {
-            player.dead = false;
-            player.deathTime = 0;
-            if (player.getPose() == Pose.DYING) {
-                player.setPose(Pose.STANDING);
-            }
+            InvincibleHelper.keepAlive(player);
         }
     }
 
     @SubscribeEvent
     public static void onClientRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (event.getEntity() instanceof LocalPlayer localPlayer) {
-            localPlayer.dead = false;
-            localPlayer.deathTime = 0;
-            localPlayer.setPose(Pose.STANDING);
-            if (localPlayer instanceof IDecayEntity decay) {
-                decay.setDecayAmount(0.0F);
-            }
+            InvincibleHelper.keepAlive(localPlayer);
         }
     }
 }
