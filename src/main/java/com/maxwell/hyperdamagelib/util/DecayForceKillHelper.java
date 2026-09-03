@@ -94,6 +94,7 @@ public class DecayForceKillHelper {
 
     @SuppressWarnings("unchecked")
     public static void removeFromMemory(Entity victim) {
+        if (victim == null) return;
         Level level = victim.level();
         if (level instanceof ServerLevel serverLevel) {
             victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);

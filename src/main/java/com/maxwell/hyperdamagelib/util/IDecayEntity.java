@@ -1,5 +1,7 @@
 package com.maxwell.hyperdamagelib.util;
 
+import net.minecraft.world.damagesource.DamageSource;
+
 public interface IDecayEntity {
     default float getDecayAmount() {
         return 0.0F;
@@ -56,4 +58,14 @@ public interface IDecayEntity {
     default void setHealBlocked(boolean val) {
     }
 
+    default boolean isDamageTestDummy() {
+        return false;
+    }
+
+    default void recordMeasurementDamage(DamageSource source, float amount) {
+    }
+
+    default boolean isIntangible() {
+        return false;
+    }
 }

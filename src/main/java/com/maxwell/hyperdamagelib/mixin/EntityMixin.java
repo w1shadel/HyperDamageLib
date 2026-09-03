@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class EntityMixin {
     @Inject(method = "isPickable", at = @At("HEAD"), cancellable = true)
     private void decay$isPickable(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
+        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
             cir.setReturnValue(false);
             cir.cancel();
         }
@@ -42,7 +42,7 @@ public abstract class EntityMixin {
 
     @Inject(method = "isAttackable", at = @At("HEAD"), cancellable = true)
     private void decay$isAttackable(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
+        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
             cir.setReturnValue(false);
             cir.cancel();
         }
@@ -50,7 +50,7 @@ public abstract class EntityMixin {
 
     @Inject(method = "canBeHitByProjectile", at = @At("HEAD"), cancellable = true)
     private void decay$canBeHitByProjectile(CallbackInfoReturnable<Boolean> cir) {
-        if ((Object) this instanceof IDecayEntity decay && decay.isSuperInvincible()) {
+        if ((Object) this instanceof IDecayEntity decay && decay.isIntangible()) {
             cir.setReturnValue(false);
             cir.cancel();
         }

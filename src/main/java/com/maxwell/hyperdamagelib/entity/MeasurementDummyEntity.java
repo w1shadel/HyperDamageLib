@@ -250,6 +250,31 @@ public class MeasurementDummyEntity extends Mob implements IDecayEntity {
     }
 
     @Override
+    public boolean isSuperInvincible() {
+        return !this.isRemoveBypass();
+    }
+
+    @Override
+    public boolean isDamageTestDummy() {
+        return !this.isRemoveBypass();
+    }
+
+    @Override
+    public void recordMeasurementDamage(DamageSource source, float amount) {
+        this.recordDamageAbsolute(source, amount);
+    }
+
+    @Override
+    public boolean isPickable() {
+        return true;
+    }
+
+    @Override
+    public boolean isAttackable() {
+        return true;
+    }
+
+    @Override
     public void setHealth(float health) {
         if (this.isRemoveBypass()) {
             super.setHealth(health);

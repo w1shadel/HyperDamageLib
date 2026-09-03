@@ -171,6 +171,9 @@ public abstract class LivingEntityMixin implements IDecayEntity {
 
     @Inject(method = "hurt", at = @At("HEAD"), cancellable = true)
     private void decay$lockHurt(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        if (this.isDamageTestDummy()) {
+            return;
+        }
         if (this.superInvincible) {
             cir.setReturnValue(false);
             cir.cancel();

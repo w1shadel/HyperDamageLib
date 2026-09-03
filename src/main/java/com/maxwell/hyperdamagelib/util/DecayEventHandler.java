@@ -53,7 +53,9 @@ import java.util.UUID;
 public class DecayEventHandler {
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingHurtSecurity(LivingHurtEvent event) {
-        if (InvincibleHelper.isInvincible(event.getEntity())) {
+        LivingEntity entity = event.getEntity();
+        if (entity instanceof IDecayEntity decay && decay.isDamageTestDummy()) return;
+        if (InvincibleHelper.isInvincible(entity)) {
             event.setCanceled(true);
             event.setAmount(0.0F);
         }
@@ -61,14 +63,18 @@ public class DecayEventHandler {
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingAttackSecurity(LivingAttackEvent event) {
-        if (InvincibleHelper.isInvincible(event.getEntity())) {
+        LivingEntity entity = event.getEntity();
+        if (entity instanceof IDecayEntity decay && decay.isDamageTestDummy()) return;
+        if (InvincibleHelper.isInvincible(entity)) {
             event.setCanceled(true);
         }
     }
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingDamageSecurity(LivingDamageEvent event) {
-        if (InvincibleHelper.isInvincible(event.getEntity())) {
+        LivingEntity entity = event.getEntity();
+        if (entity instanceof IDecayEntity decay && decay.isDamageTestDummy()) return;
+        if (InvincibleHelper.isInvincible(entity)) {
             event.setCanceled(true);
             event.setAmount(0.0F);
         }
