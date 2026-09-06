@@ -1,7 +1,7 @@
 package com.maxwell.hyperdamagelib.entity;
 
 import com.maxwell.hyperdamagelib.init.ModItems;
-import net.minecraft.core.NonNullList;
+import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -24,23 +24,21 @@ import java.util.List;
 import java.util.UUID;
 
 public class MeasurementDummyEntity extends Mob {
-
     private final List<Record> damageRecords = new ArrayList<>();
     private final List<Record> healRecords = new ArrayList<>();
-
     private long lastDamageTime = 0;
     private long sessionStartTime = 0;
     private float totalDamageSession = 0.0F;
     private float totalHealSession = 0.0F;
     private float lastDamageAmount = 0.0F;
     private UUID lastAttackerUuid = null;
-
     private boolean removeBypass = false;
 
     public MeasurementDummyEntity(EntityType<? extends Mob> type, Level level) {
         super(type, level);
         this.setNoGravity(false);
         this.setInvulnerable(false);
+        InvincibleHelper.setInvincible(this,true);
     }
 
     public static AttributeSupplier.Builder createAttributes() {
@@ -50,9 +48,6 @@ public class MeasurementDummyEntity extends Mob {
                 .add(Attributes.ARMOR, 0.0D)
                 .add(Attributes.ARMOR_TOUGHNESS, 0.0D);
     }
-
-
-
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -65,17 +60,14 @@ public class MeasurementDummyEntity extends Mob {
 
     public void recordDamageAbsolute(DamageSource source, float amount) {
         if (this.level().isClientSide() || amount <= 0.0F || Float.isNaN(amount)) return;
-
         long now = System.currentTimeMillis();
         if (this.damageRecords.isEmpty()) {
             this.sessionStartTime = now;
         }
-
         this.lastDamageTime = now;
         this.lastDamageAmount = amount;
         this.totalDamageSession += amount;
         this.damageRecords.add(new Record(amount, now));
-
         Entity attacker = source.getEntity();
         if (attacker instanceof ServerPlayer player) {
             this.lastAttackerUuid = player.getUUID();
@@ -84,7 +76,6 @@ public class MeasurementDummyEntity extends Mob {
             Player player = this.level().getPlayerByUUID(this.lastAttackerUuid);
             if (player instanceof ServerPlayer sp) updateActionBar(sp);
         }
-
         this.level().broadcastDamageEvent(this, source);
         this.setDeltaMovement(Vec3.ZERO);
         this.hurtMarked = false;
@@ -94,11 +85,9 @@ public class MeasurementDummyEntity extends Mob {
     @Override
     public void heal(float amount) {
         if (this.level().isClientSide() || amount <= 0.0F || Float.isNaN(amount)) return;
-
         long now = System.currentTimeMillis();
         this.totalHealSession += amount;
         this.healRecords.add(new Record(amount, now));
-
         if (this.lastAttackerUuid != null) {
             Player player = this.level().getPlayerByUUID(this.lastAttackerUuid);
             if (player instanceof ServerPlayer sp) updateActionBar(sp);
@@ -106,34 +95,25 @@ public class MeasurementDummyEntity extends Mob {
         super.heal(amount);
     }
 
-
-
-
     @Override
     public void tick() {
         super.tick();
-
         if (this.level().isClientSide()) return;
-
         if (!this.removeBypass) {
             this.dead = false;
             this.deathTime = 0;
         }
-
         long now = System.currentTimeMillis();
         cleanupOldRecords(now);
-
         if (this.totalDamageSession > 0 && (now - this.lastDamageTime > 3000)) {
             sendSessionSummary();
             forceResetStats();
         }
-
         if (this.getY() < this.level().getMinBuildHeight() - 32.0D) {
             net.minecraft.core.BlockPos sharedSpawn = this.level().getSharedSpawnPos();
             this.teleportTo(sharedSpawn.getX() + 0.5D, sharedSpawn.getY() + 2.0D, sharedSpawn.getZ() + 0.5D);
             this.setDeltaMovement(Vec3.ZERO);
         }
-
         this.setYRot(0.0F);
         this.setXRot(0.0F);
     }
@@ -142,14 +122,13 @@ public class MeasurementDummyEntity extends Mob {
         long now = System.currentTimeMillis();
         float dps = calculateDPS(now);
         float hps = calculateHPS(now);
-
         Component actionBarMsg = Component.translatable("commands.hdl.dummy.action_bar",
                 String.format("%.1f", this.lastDamageAmount),
                 String.format("%.1f", dps),
                 String.format("%.1f", hps),
                 String.format("%.1f", this.totalDamageSession)
         );
-        player.sendSystemMessage(actionBarMsg, true); 
+        player.sendSystemMessage(actionBarMsg, true);
     }
 
     private void sendSessionSummary() {
@@ -159,7 +138,6 @@ public class MeasurementDummyEntity extends Mob {
             long durationMs = this.lastDamageTime - this.sessionStartTime;
             float durationSecs = Math.max(1.0F, durationMs / 1000.0F);
             float avgDps = this.totalDamageSession / durationSecs;
-
             sp.sendSystemMessage(Component.translatable("commands.hdl.dummy.summary.header"));
             sp.sendSystemMessage(Component.translatable("commands.hdl.dummy.summary.total", String.format("%.1f", this.totalDamageSession)));
             sp.sendSystemMessage(Component.translatable("commands.hdl.dummy.summary.duration", String.format("%.1f", durationSecs)));
@@ -169,7 +147,6 @@ public class MeasurementDummyEntity extends Mob {
     }
 
     private void cleanupOldRecords(long now) {
-
         this.damageRecords.removeIf(r -> now - r.timestamp > 10000);
         this.healRecords.removeIf(r -> now - r.timestamp > 10000);
     }
@@ -207,21 +184,24 @@ public class MeasurementDummyEntity extends Mob {
         this.lastAttackerUuid = null;
     }
 
-
-
-
     @Override
     public void setHealth(float health) {
         if (this.removeBypass) super.setHealth(health);
         else super.setHealth(this.getMaxHealth());
     }
 
-    @Override public void die(DamageSource cause) { if (this.removeBypass) super.die(cause); }
-    @Override public void kill() { if (this.removeBypass) super.kill(); }
+    @Override
+    public void die(DamageSource cause) {
+        if (this.removeBypass) super.die(cause);
+    }
+
+    @Override
+    public void kill() {
+        if (this.removeBypass) super.kill();
+    }
 
     @Override
     public void remove(Entity.RemovalReason reason) {
-
         if (reason.shouldDestroy()) {
             if (this.removeBypass) super.remove(reason);
         } else {
@@ -229,22 +209,29 @@ public class MeasurementDummyEntity extends Mob {
         }
     }
 
-    @Override public boolean isDeadOrDying() { return this.removeBypass && super.isDeadOrDying(); }
-    @Override public boolean isAlive() { return !this.removeBypass || super.isAlive(); }
-    @Override public void handleEntityEvent(byte id) { if (id == 3 && !this.removeBypass) return; super.handleEntityEvent(id); }
+    @Override
+    public boolean isDeadOrDying() {
+        return this.removeBypass && super.isDeadOrDying();
+    }
 
+    @Override
+    public boolean isAlive() {
+        return !this.removeBypass || super.isAlive();
+    }
 
-
+    @Override
+    public void handleEntityEvent(byte id) {
+        if (id == 3 && !this.removeBypass) return;
+        super.handleEntityEvent(id);
+    }
 
     @Override
     public InteractionResult mobInteract(Player player, InteractionHand hand) {
         if (player.level().isClientSide()) return InteractionResult.SUCCESS;
         ItemStack held = player.getItemInHand(hand);
-
         if (held.getItem() == ModItems.DUMMY_CONTROLLER.get()) {
             return InteractionResult.PASS;
         }
-
         EquipmentSlot slot = getArmorSlotForItem(held);
         if (slot != null) {
             ItemStack current = this.getItemBySlot(slot);
@@ -266,17 +253,35 @@ public class MeasurementDummyEntity extends Mob {
         return (slot != null && slot.getType() == EquipmentSlot.Type.ARMOR) ? slot : null;
     }
 
-    public boolean isRemoveBypass() { return this.removeBypass; }
-    public void setRemoveBypass(boolean val) { this.removeBypass = val; }
+    public boolean isRemoveBypass() {
+        return this.removeBypass;
+    }
 
-    @Override public void knockback(double strength, double x, double z) {}
-    @Override public boolean isPushable() { return false; }
-    @Override public void push(Entity entity) {}
-    @Override public void push(double x, double y, double z) {}
+    public void setRemoveBypass(boolean val) {
+        this.removeBypass = val;
+    }
+
+    @Override
+    public void knockback(double strength, double x, double z) {
+    }
+
+    @Override
+    public boolean isPushable() {
+        return false;
+    }
+
+    @Override
+    public void push(Entity entity) {
+    }
+
+    @Override
+    public void push(double x, double y, double z) {
+    }
 
     private static class Record {
         final float amount;
         final long timestamp;
+
         Record(float amount, long timestamp) {
             this.amount = amount;
             this.timestamp = timestamp;

@@ -1,11 +1,12 @@
 package com.maxwell.hyperdamagelib.network.client;
 
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
+import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.network.NetworkEvent;
@@ -59,14 +60,24 @@ public class ClientboundDecaySyncPacket {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level != null) {
             Entity entity = mc.level.getEntity(this.entityId);
-            if (entity instanceof IDecayEntity decay) {
-                decay.setKeepCurrentHealth(this.keepCurrentHealth);
-                decay.setInvincibleHealthValue(this.invincibleHealthValue);
-                decay.setSuperInvincible(this.superInvincible);
-                decay.setHealBlocked(this.healBlocked);
+            if (entity != null) {
+
                 InvincibleHelper.setInvincible(entity, this.superInvincible);
-                if (this.superInvincible && entity instanceof LivingEntity living) {
-                    InvincibleHelper.keepAlive(living);
+                InvincibleHelper.setHealBlocked(entity, this.healBlocked);
+
+                if (entity instanceof LivingEntity living) {
+                    InvincibleHelper.setInvincibleHealth(living, this.invincibleHealthValue);
+                    if (this.superInvincible) {
+                        living.dead = false;
+                        living.deathTime = 0;
+                        if (living.getPose() == Pose.DYING) {
+                            living.setPose(Pose.STANDING);
+                        }
+                        living.setHealth(this.invincibleHealthValue > 0 ? this.invincibleHealthValue : 20.0F);
+                        try {
+                            living.getEntityData().set(LivingEntityAccessor.getDataHealthId(), this.invincibleHealthValue > 0 ? this.invincibleHealthValue : 20.0F);
+                        } catch (Throwable ignored) {}
+                    }
                 }
             }
         }

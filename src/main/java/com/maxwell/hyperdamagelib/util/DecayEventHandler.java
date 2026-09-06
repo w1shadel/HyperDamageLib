@@ -1,16 +1,15 @@
 package com.maxwell.hyperdamagelib.util;
 
 import com.maxwell.hyperdamagelib.HDL;
-import com.maxwell.hyperdamagelib.init.ModEntities;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
-import com.maxwell.hyperdamagelib.transformer.DecayEntityMethods;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -18,37 +17,118 @@ import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.api.distmarker.OnlyIn;
+import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.registries.ForgeRegistries;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
-import java.util.Map;
-import java.util.UUID;
 
 @Mod.EventBusSubscriber(modid = HDL.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayEventHandler {
+
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        InvincibleHelper.clearAllSessionData();
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @SubscribeEvent
+    public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
+        InvincibleHelper.clearAllSessionData();
+    }
+
+    @SubscribeEvent
+    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
+        InvincibleHelper.SERVER_REMOVE_BYPASS.remove(event.getEntity().getUUID());
+        InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(event.getEntity().getUUID());
+    }
+
+
+    @SubscribeEvent
+    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            syncDecayState(player);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onStartTracking(PlayerEvent.StartTracking event) {
+        if (event.getTarget() instanceof LivingEntity living && event.getEntity() instanceof ServerPlayer tracker) {
+            if (!living.level().isClientSide()) {
+                ModMessages.INSTANCE.send(
+                        PacketDistributor.PLAYER.with(() -> tracker),
+                        new ClientboundDecaySyncPacket(
+                                living.getId(),
+                                InvincibleHelper.isInvincible(living),
+                                true,
+                                InvincibleHelper.getInvincibleHealth(living),
+                                InvincibleHelper.isHealBlocked(living)
+                        )
+                );
+            }
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPlayerClone(PlayerEvent.Clone event) {
+        Player original = event.getOriginal();
+        Player newPlayer = event.getEntity();
+
+        InvincibleHelper.setRemoveBypass(original, true);
+
+        boolean wasInvincible = InvincibleHelper.isInvincible(original);
+        if (wasInvincible) {
+            InvincibleHelper.setInvincible(newPlayer, true);
+        }
+        InvincibleHelper.keepAlive(newPlayer);
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            InvincibleHelper.keepAlive(player);
+            syncDecayState(player);
+        }
+    }
+
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
+        LivingEntity entity = event.getEntity();
+        if (entity == null) return;
+        if (InvincibleHelper.isInvincible(entity)) {
+            InvincibleHelper.keepAlive(entity);
+
+            if (!entity.level().isClientSide()) {
+                double y = entity.getY();
+                if (Double.isNaN(y) || Double.isInfinite(y) || y < entity.level().getMinBuildHeight() - 32.0D) {
+                    teleportToSafePosition(entity);
+                }
+            }
+        }
+    }
+
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingHurtSecurity(LivingHurtEvent event) {
@@ -83,6 +163,7 @@ public class DecayEventHandler {
     public static void onLivingDeathSecurity(LivingDeathEvent event) {
         if (InvincibleHelper.isInvincible(event.getEntity())) {
             event.setCanceled(true);
+            InvincibleHelper.keepAlive(event.getEntity());
         }
     }
 
@@ -96,76 +177,12 @@ public class DecayEventHandler {
     }
 
     @SubscribeEvent
-    public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
-        UUID uuid = event.getEntity().getUUID();
-        InvincibleHelper.SERVER_REMOVE_BYPASS.remove(uuid);
-        InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(uuid);
-    }
-
-    @SubscribeEvent
-    public static void onServerStopped(net.minecraftforge.event.server.ServerStoppedEvent event) {
-        InvincibleHelper.SERVER_REMOVE_BYPASS.clear();
-        InvincibleHelper.CLIENT_REMOVE_BYPASS.clear();
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPlayerClone(PlayerEvent.Clone event) {
-        Player newPlayer = event.getEntity();
-        InvincibleHelper.setInvincible(newPlayer, false);
-        InvincibleHelper.setHealBlocked(newPlayer, false);
-        InvincibleHelper.keepAlive(newPlayer);
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            InvincibleHelper.setInvincible(player, false);
-            InvincibleHelper.setHealBlocked(player, false);
-            InvincibleHelper.keepAlive(player);
-            syncDecayState(player);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onLivingTick(LivingEvent.LivingTickEvent event) {
-        LivingEntity entity = event.getEntity();
-        if (entity.level().isClientSide()) return;
-        if (entity instanceof ServerPlayer player && player.connection == null) return;
-
-        if (InvincibleHelper.isInvincible(entity)) {
-            double minHeight = entity.level().getMinBuildHeight() - 32.0D;
-            if (entity.getY() < minHeight) {
-                teleportToSafePosition(entity);
-            }
-            InvincibleHelper.keepAlive(entity);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (event.getEntity() instanceof ServerPlayer player) {
-            syncDecayState(player);
-        }
-    }
-
-    @SubscribeEvent
-    public static void onStartTracking(PlayerEvent.StartTracking event) {
-        if (event.getTarget() instanceof LivingEntity living && event.getEntity() instanceof ServerPlayer tracker) {
-            if (living instanceof IDecayEntity decay) {
-                ModMessages.INSTANCE.send(
-                        PacketDistributor.PLAYER.with(() -> tracker),
-                        new ClientboundDecaySyncPacket(living.getId(), decay.isSuperInvincible(), decay.isKeepCurrentHealth(), decay.getInvincibleHealthValue(), decay.isHealBlocked())
-                );
-            }
-        }
-    }
-
-    @SubscribeEvent
     public static void onItemPickup(EntityItemPickupEvent event) {
         if (event.getEntity() instanceof ServerPlayer serverPlayer && serverPlayer.connection == null) {
             event.setCanceled(true);
         }
     }
+
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
@@ -173,13 +190,6 @@ public class DecayEventHandler {
         dispatcher.register(
                 Commands.literal("hdl")
                         .requires(source -> source.hasPermission(2))
-                        .then(Commands.literal("inspect")
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayer();
-                                    if (player != null) performInspection(player);
-                                    return 1;
-                                })
-                        )
                         .then(Commands.literal("forceDamage")
                                 .then(Commands.argument("targets", EntityArgument.entities())
                                         .then(Commands.argument("amount", FloatArgumentType.floatArg(0.0F))
@@ -255,17 +265,16 @@ public class DecayEventHandler {
 
     private static int forceDamage(CommandSourceStack source, Collection<? extends Entity> targets, float amount, @Nullable Entity attacker) {
         int count = 0;
-        try {
-            DecayDamageUtil.FORCE_DAMAGE.set(true);
-            for (Entity entity : targets) {
-                if (entity instanceof LivingEntity living) {
+        for (Entity entity : targets) {
+            if (entity instanceof LivingEntity living) {
+                try (var ignored = DecayDamageUtil.forceKillScope(living)) {
                     DamageSource damageSource = DecayDamageUtil.getErosionSource(living.level(), attacker);
                     DecayDamageUtil.applyCustomDamage(living, damageSource, amount);
                     count++;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
             }
-        } finally {
-            DecayDamageUtil.FORCE_DAMAGE.remove();
         }
         final int finalCount = count;
         source.sendSuccess(() -> Component.translatable("commands.hdl.force_damage.success", finalCount, amount), true);
@@ -291,14 +300,15 @@ public class DecayEventHandler {
     }
 
     private static void executeForceHeal(LivingEntity target, @Nullable Float amount) {
-        try {
-            DecayDamageUtil.BYPASS_DECAY.set(true);
+        try (var ignored = DecayDamageUtil.bypassScope(target)) {
             float originalMax = (float) target.getAttributeValue(Attributes.MAX_HEALTH);
-            float targetHealth = (amount == null) ? originalMax : Math.min(originalMax, target.getHealth() + amount);
+            Float rawHp = target.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+            float curHp = (rawHp != null && !Float.isNaN(rawHp)) ? rawHp : originalMax;
+            float targetHealth = (amount == null) ? originalMax : Math.min(originalMax, curHp + amount);
             target.setHealth(targetHealth);
             InvincibleHelper.keepAlive(target);
-        } finally {
-            DecayDamageUtil.BYPASS_DECAY.remove();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -352,16 +362,15 @@ public class DecayEventHandler {
 
     private static int forceEffectClear(CommandSourceStack source, Collection<? extends Entity> targets, MobEffect effect) {
         int count = 0;
-        try {
-            DecayDamageUtil.BYPASS_EFFECT.set(true);
-            for (Entity entity : targets) {
-                if (entity instanceof LivingEntity living) {
+        for (Entity entity : targets) {
+            if (entity instanceof LivingEntity living) {
+                try (var ignored = DecayDamageUtil.bypassEffectScope(living)) {
                     living.removeEffect(effect);
                     count++;
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
                 }
             }
-        } finally {
-            DecayDamageUtil.BYPASS_EFFECT.remove();
         }
         final int finalCount = count;
         source.sendSuccess(() -> Component.translatable("commands.hdl.force_effect.clear.success", finalCount, effect.getDisplayName()), true);
@@ -369,18 +378,7 @@ public class DecayEventHandler {
     }
 
     private static void syncDecayState(LivingEntity entity) {
-        if (entity instanceof IDecayEntity decay && !entity.level().isClientSide()) {
-            ModMessages.INSTANCE.send(
-                    PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity),
-                    new ClientboundDecaySyncPacket(
-                            entity.getId(),
-                            decay.isSuperInvincible(),
-                            decay.isKeepCurrentHealth(),
-                            decay.getInvincibleHealthValue(),
-                            decay.isHealBlocked()
-                    )
-            );
-        }
+        InvincibleHelper.syncToTracking(entity);
     }
 
     private static void teleportToSafePosition(LivingEntity entity) {
@@ -403,31 +401,5 @@ public class DecayEventHandler {
             entity.teleportTo(sharedSpawn.getX() + 0.5D, sharedSpawn.getY() + 1.0D, sharedSpawn.getZ() + 0.5D);
         }
         entity.fallDistance = 0.0F;
-    }
-
-    private static void performInspection(ServerPlayer player) {
-        if (player == null) return;
-        float getHealthVal = player.getHealth();
-        float maxHealthVal = player.getMaxHealth();
-        float trueHealthVal = DecayEntityMethods.getTrueHealth(player);
-        Float entityDataHealth = player.getEntityData().get(LivingEntityAccessor.getDataHealthId());
-        boolean isAliveVal = player.isAlive();
-        boolean isDeadOrDyingVal = player.isDeadOrDying();
-        boolean isReallyAliveVal = DecayEntityMethods.isReallyAlive(player);
-        boolean rawDeadField = player.dead;
-        int deathTimeVal = player.deathTime;
-        boolean isRemovedVal = player.isRemoved();
-
-        player.sendSystemMessage(Component.literal("§d================ HDL Diagnostics ================"));
-        player.sendSystemMessage(Component.literal("§e[Health Values]"));
-        player.sendSystemMessage(Component.literal("  §7- player.getHealth(): §f" + getHealthVal + " / " + maxHealthVal));
-        player.sendSystemMessage(Component.literal("  §7- DecayEntityMethods.getTrueHealth(): §a" + trueHealthVal));
-        player.sendSystemMessage(Component.literal("  §7- EntityData (DATA_HEALTH_ID): §b" + entityDataHealth));
-        player.sendSystemMessage(Component.literal("§e[State Values]"));
-        player.sendSystemMessage(Component.literal("  §7- isAlive(): §f" + (isAliveVal ? "§aTRUE" : "§cFALSE") + " §7| isReallyAlive(): §f" + (isReallyAliveVal ? "§aTRUE" : "§cFALSE")));
-        player.sendSystemMessage(Component.literal("  §7- isDeadOrDying(): §f" + (isDeadOrDyingVal ? "§cTRUE" : "§aFALSE") + " §7| dead(field): §f" + (rawDeadField ? "§cTRUE" : "§aFALSE") + " | deathTime: " + deathTimeVal));
-        player.sendSystemMessage(Component.literal("  §7- isRemoved(): §f" + (isRemovedVal ? "§cTRUE" : "§aFALSE")));
-        player.sendSystemMessage(Component.literal("  §7- isSuperInvincible(): §f" + (InvincibleHelper.isInvincible(player) ? "§aON" : "§cOFF")));
-        player.sendSystemMessage(Component.literal("§d================================================"));
     }
 }

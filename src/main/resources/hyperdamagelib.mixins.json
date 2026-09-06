@@ -5,21 +5,14 @@
   "plugin": "com.maxwell.hyperdamagelib.HDLMixinPlugin",
   "refmap": "hyperdamagelib.refmap.json",
   "mixins": [
-    "EntityMixin",
-    "ForgeHooksMixin",
-    "LivingEntityMixin",
-    "ServerLevelMixin",
-    "ServerPlayerMixin",
-    "SynchedEntityDataMixin",
     "accessor.EntityAccessor",
     "accessor.LivingEntityAccessor",
-    "accessor.SynchedEntityDataAccessor"
+    "accessor.SynchedEntityDataAccessor",
+    "ForgeHooksMixin"
   ],
   "client": [
-    "client.ClientPacketListenerMixin",
     "client.ItemRendererMixin",
-    "client.ItemTransformMixin",
-    "client.MinecraftMixin"
+    "client.ItemTransformMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -20,16 +20,13 @@ import java.util.Objects;
 public class DecayForceKillHelper {
     public static void decayForceKill(LivingEntity entity) {
         if (entity.level().isClientSide()) return;
-        try {
-            DecayDamageUtil.FORCE_DAMAGE.set(true);
+
+        try (var ignored1 = DecayDamageUtil.forceKillScope(entity)) {
             breakBrain(entity);
 
-            try {
-                DecayDamageUtil.BYPASS_DECAY.set(true);
+            try (var ignored2 = DecayDamageUtil.bypassScope(entity)) {
                 entity.setHealth(0.0F);
                 entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
-            } finally {
-                DecayDamageUtil.BYPASS_DECAY.remove();
             }
 
             DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
@@ -42,8 +39,8 @@ public class DecayForceKillHelper {
                 entity.discard();
                 removeFromMemory(entity);
             }
-        } finally {
-            DecayDamageUtil.FORCE_DAMAGE.remove();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -55,8 +52,7 @@ public class DecayForceKillHelper {
                 breakGoalSelector(mob.targetSelector);
                 mob.setTarget(null);
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static void breakGoalSelector(GoalSelector goalSelector) {
@@ -68,8 +64,7 @@ public class DecayForceKillHelper {
                     return false;
                 }
             });
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static void dropAllForce(LivingEntity livingEntity) {

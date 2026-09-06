@@ -1,7 +1,6 @@
 package com.maxwell.hyperdamagelib.item;
 
 import com.maxwell.hyperdamagelib.util.DecayDamageUtil;
-import com.maxwell.hyperdamagelib.util.IDecayEntity;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
@@ -71,28 +70,25 @@ public class ErosionSwordItem extends SwordItem {
         if (!level.isClientSide()) {
             if (player.isShiftKeyDown()) {
                 boolean nextState = !InvincibleHelper.isInvincible(player);
-                if (player instanceof IDecayEntity decay) {
-                    decay.setSuperInvincible(nextState);
-                    if (nextState) {
-                        float lockedHp = decay.getInvincibleHealthValue();
-                        player.displayClientMessage(
-                                Component.translatable("message.hyperdamagelib.super_invincible.on_current", String.format("%.1f", lockedHp)),
-                                true
-                        );
-                    } else {
-                        try {
-                            DecayDamageUtil.BYPASS_DECAY.set(true);
-                            player.setHealth(decay.getInvincibleHealthValue());
-                            player.dead = false;
-                            player.deathTime = 0;
-                        } finally {
-                            DecayDamageUtil.BYPASS_DECAY.remove();
-                        }
-                        player.displayClientMessage(
-                                Component.translatable("message.hyperdamagelib.super_invincible.off"),
-                                true
-                        );
+                InvincibleHelper.setInvincible(player, nextState);
+                if (nextState) {
+                    float lockedHp = InvincibleHelper.getInvincibleHealth(player);
+                    player.displayClientMessage(
+                            Component.translatable("message.hyperdamagelib.super_invincible.on_current", String.format("%.1f", lockedHp)),
+                            true
+                    );
+                } else {
+                    try (var ignored = DecayDamageUtil.bypassScope(player)) {
+                        player.setHealth(player.getHealth());
+                        player.dead = false;
+                        player.deathTime = 0;
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
                     }
+                    player.displayClientMessage(
+                            Component.translatable("message.hyperdamagelib.super_invincible.off"),
+                            true
+                    );
                 }
                 level.playSound(null, player.blockPosition(), nextState ? SoundEvents.BEACON_ACTIVATE : SoundEvents.BEACON_DEACTIVATE, SoundSource.PLAYERS, 1.0F, 1.5F);
             }

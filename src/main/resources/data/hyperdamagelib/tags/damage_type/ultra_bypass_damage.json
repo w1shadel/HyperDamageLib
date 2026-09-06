@@ -1,7 +1,6 @@
 {
   "values": [
     "hyperdamagelib:erosion",
-    "hyperdamagelib:void_shred",
     "hyperdamagelib:penetrate"
   ]
 }

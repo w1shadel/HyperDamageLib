@@ -4,6 +4,7 @@ import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.util.InvincibleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.world.entity.Pose;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -14,17 +15,17 @@ import net.minecraftforge.fml.common.Mod;
 public class DecayClientEventHandler {
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
-        if (event.phase == TickEvent.Phase.END) {
-            DecayClientEffectHelper.clientTick();
-            maintainClientInvincibleState();
-        }
-    }
+        if (event.phase != TickEvent.Phase.END) return;
+        DecayClientEffectHelper.clientTick();
 
-    private static void maintainClientInvincibleState() {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null || mc.level == null) return;
-        if (InvincibleHelper.isInvincible(player)) {
+        if (player != null && InvincibleHelper.isInvincible(player)) {
+            player.dead = false;
+            player.deathTime = 0;
+            if (player.getPose() == Pose.DYING) {
+                player.setPose(Pose.STANDING);
+            }
             InvincibleHelper.keepAlive(player);
         }
     }
