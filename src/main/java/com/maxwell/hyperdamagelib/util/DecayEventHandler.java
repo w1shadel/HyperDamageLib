@@ -9,7 +9,6 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import net.minecraft.client.Minecraft;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -17,6 +16,7 @@ import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffect;
@@ -29,7 +29,7 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.living.*;
 import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -45,8 +45,6 @@ import java.util.Collection;
 
 @Mod.EventBusSubscriber(modid = HDL.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayEventHandler {
-
-
     @SubscribeEvent
     public static void onServerStopped(ServerStoppedEvent event) {
         InvincibleHelper.clearAllSessionData();
@@ -59,11 +57,37 @@ public class DecayEventHandler {
     }
 
     @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        if (event.getLevel().isClientSide()) return;
+
+        Entity entity = event.getEntity();
+        if (entity instanceof Player) return;
+
+        if (event.getLevel() instanceof ServerLevel serverLevel) {
+            PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);
+
+            if (data != null && data.isPurged(entity)) {
+                event.setCanceled(true);
+
+                if (entity instanceof LivingEntity living) {
+
+                    DecayForceKillHelper.purgeBossBars(living, serverLevel);
+
+                    DecayForceKillHelper.breakControllers(living);
+                    DecayForceKillHelper.breakBrain(living);
+                    DecayForceKillHelper.removeFromMemory(living);
+                } else {
+                    DecayForceKillHelper.removeFromMemory(entity);
+                }
+            }
+        }
+    }
+
+    @SubscribeEvent
     public static void onPlayerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         InvincibleHelper.SERVER_REMOVE_BYPASS.remove(event.getEntity().getUUID());
         InvincibleHelper.CLIENT_REMOVE_BYPASS.remove(event.getEntity().getUUID());
     }
-
 
     @SubscribeEvent
     public static void onPlayerJoin(PlayerEvent.PlayerLoggedInEvent event) {
@@ -94,9 +118,7 @@ public class DecayEventHandler {
     public static void onPlayerClone(PlayerEvent.Clone event) {
         Player original = event.getOriginal();
         Player newPlayer = event.getEntity();
-
         InvincibleHelper.setRemoveBypass(original, true);
-
         boolean wasInvincible = InvincibleHelper.isInvincible(original);
         if (wasInvincible) {
             InvincibleHelper.setInvincible(newPlayer, true);
@@ -112,14 +134,12 @@ public class DecayEventHandler {
         }
     }
 
-
     @SubscribeEvent(priority = EventPriority.HIGHEST)
     public static void onLivingTick(LivingEvent.LivingTickEvent event) {
         LivingEntity entity = event.getEntity();
         if (entity == null) return;
         if (InvincibleHelper.isInvincible(entity)) {
             InvincibleHelper.keepAlive(entity);
-
             if (!entity.level().isClientSide()) {
                 double y = entity.getY();
                 if (Double.isNaN(y) || Double.isInfinite(y) || y < entity.level().getMinBuildHeight() - 32.0D) {
@@ -128,7 +148,6 @@ public class DecayEventHandler {
             }
         }
     }
-
 
     @SubscribeEvent(priority = EventPriority.HIGHEST, receiveCanceled = true)
     public static void onLivingHurtSecurity(LivingHurtEvent event) {
@@ -182,7 +201,6 @@ public class DecayEventHandler {
             event.setCanceled(true);
         }
     }
-
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {

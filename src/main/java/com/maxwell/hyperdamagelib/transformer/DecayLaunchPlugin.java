@@ -30,20 +30,17 @@ public class DecayLaunchPlugin implements ILaunchPluginService {
         if (classNode.name.startsWith("com/maxwell/hyperdamagelib/transformer/")) {
             return ComputeFlags.NO_REWRITE;
         }
-
         if (phase == Phase.AFTER) {
             try {
                 int result = DecayGenericTransformer.transform(classNode);
                 return result != 0 ? result : ComputeFlags.NO_REWRITE;
             } catch (Throwable t) {
-
                 com.maxwell.hyperdamagelib.HDL.LOGGER.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 com.maxwell.hyperdamagelib.HDL.LOGGER.error("[HDL-CRITICAL-FAIL] Transformation crashed on: " + classNode.name, t);
                 com.maxwell.hyperdamagelib.HDL.LOGGER.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 return ComputeFlags.NO_REWRITE;
             }
         }
-
         return ComputeFlags.NO_REWRITE;
     }
 }

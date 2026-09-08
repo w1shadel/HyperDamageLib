@@ -17,7 +17,6 @@ public class DecayClientEventHandler {
     public static void onClientTick(TickEvent.ClientTickEvent event) {
         if (event.phase != TickEvent.Phase.END) return;
         DecayClientEffectHelper.clientTick();
-
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
         if (player != null && InvincibleHelper.isInvincible(player)) {

@@ -77,6 +77,18 @@ repositories {
         name = "Modrinth Maven"
         url = "https://api.modrinth.com/maven"
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        // forRepositories(fg.repository) // Uncomment when using ForgeGradle
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 sourceSets.main.resources {
@@ -104,6 +116,7 @@ dependencies {
     implementation fg.deobf("curse.maven:better-combat-by-daedelus-639842:7287334")
     implementation fg.deobf("curse.maven:playeranimator-658587:4587214")
     implementation fg.deobf("curse.maven:imds-reborn-1008701:8538912")
+    implementation fg.deobf("curse.maven:the-trial-monolith-1462850:8561617")
 
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }

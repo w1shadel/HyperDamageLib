@@ -17,12 +17,42 @@ import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
 public class DecaySword extends SwordItem {
     public DecaySword(Properties properties) {
         super(Tiers.NETHERITE, -999999999, -2.4F, properties);
+    }
+
+    @Override
+    public boolean onEntitySwing(ItemStack stack, LivingEntity attacker) {
+        Level level = attacker.level();
+        if (!level.isClientSide()) {
+            double range = 5.0D;
+            Vec3 eyePos = attacker.getEyePosition(1.0F);
+            Vec3 lookVec = attacker.getLookAngle();
+            AABB searchBox = attacker.getBoundingBox().expandTowards(lookVec.scale(range)).inflate(2.0D);
+            List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, searchBox,
+                    e -> e != attacker && !e.isSpectator());
+            DamageSource source = DecayDamageUtil.getPenetrateSource(level, attacker, "死ね！w");
+            boolean hit = false;
+            for (LivingEntity target : targets) {
+                Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePos);
+                if (toTarget.length() <= range && lookVec.dot(toTarget.normalize()) > 0.35D) {
+                    target.hurt(source, 20);
+                    if (level instanceof ServerLevel serverLevel) {
+                        serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + 1.0, target.getZ(), 10, 0.2, 0.2, 0.2, 0.1);
+                    }
+                    hit = true;
+                }
+            }
+            if (hit) {
+                level.playSound(null, attacker.blockPosition(), SoundEvents.SOUL_ESCAPE, SoundSource.PLAYERS, 1.0F, 1.2F);
+            }
+        }
+        return false;
     }
 
     @Override

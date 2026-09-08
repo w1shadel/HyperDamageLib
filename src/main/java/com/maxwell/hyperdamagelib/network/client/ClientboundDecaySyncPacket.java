@@ -61,10 +61,8 @@ public class ClientboundDecaySyncPacket {
         if (mc.level != null) {
             Entity entity = mc.level.getEntity(this.entityId);
             if (entity != null) {
-
                 InvincibleHelper.setInvincible(entity, this.superInvincible);
                 InvincibleHelper.setHealBlocked(entity, this.healBlocked);
-
                 if (entity instanceof LivingEntity living) {
                     InvincibleHelper.setInvincibleHealth(living, this.invincibleHealthValue);
                     if (this.superInvincible) {
@@ -76,7 +74,8 @@ public class ClientboundDecaySyncPacket {
                         living.setHealth(this.invincibleHealthValue > 0 ? this.invincibleHealthValue : 20.0F);
                         try {
                             living.getEntityData().set(LivingEntityAccessor.getDataHealthId(), this.invincibleHealthValue > 0 ? this.invincibleHealthValue : 20.0F);
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {
+                        }
                     }
                 }
             }

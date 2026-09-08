@@ -38,7 +38,7 @@ public class MeasurementDummyEntity extends Mob {
         super(type, level);
         this.setNoGravity(false);
         this.setInvulnerable(false);
-        InvincibleHelper.setInvincible(this,true);
+        InvincibleHelper.setInvincible(this, true);
     }
 
     public static AttributeSupplier.Builder createAttributes() {

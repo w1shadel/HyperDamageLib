@@ -10,10 +10,8 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraftforge.network.PacketDistributor;
-import sun.misc.Unsafe;
 
 import javax.annotation.Nullable;
-import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -22,13 +20,12 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class InvincibleHelper {
     public static final Set<UUID> SERVER_REMOVE_BYPASS = ConcurrentHashMap.newKeySet();
     public static final Set<UUID> CLIENT_REMOVE_BYPASS = ConcurrentHashMap.newKeySet();
-
     private static final Set<UUID> SUPER_INVINCIBLE = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, Float> LOCKED_HEALTH = new ConcurrentHashMap<>();
     private static final Set<UUID> HEAL_BLOCKED = ConcurrentHashMap.newKeySet();
 
-
-    private InvincibleHelper() {}
+    private InvincibleHelper() {
+    }
 
     public static void clearAllSessionData() {
         SUPER_INVINCIBLE.clear();
@@ -53,21 +50,17 @@ public final class InvincibleHelper {
         try {
             UUID uuid = entity.getUUID();
             if (uuid == null) return;
-
             if (invincible) {
                 SUPER_INVINCIBLE.add(uuid);
                 if (entity instanceof LivingEntity living) {
-
                     float currentHp = living.getHealth();
                     if (currentHp <= 0.0F || Float.isNaN(currentHp)) {
-                        currentHp = 1.0F; 
+                        currentHp = 1.0F;
                     }
                     currentHp = Math.min(currentHp, living.getMaxHealth());
                     LOCKED_HEALTH.put(uuid, currentHp);
-
                     living.setInvulnerable(true);
                     keepAlive(living);
-
                     try (var ignored = DecayDamageUtil.bypassScope(living)) {
                         living.setHealth(currentHp);
                         living.getEntityData().set(LivingEntityAccessor.getDataHealthId(), currentHp);
@@ -78,11 +71,11 @@ public final class InvincibleHelper {
                 LOCKED_HEALTH.remove(uuid);
                 entity.setInvulnerable(false);
             }
-
             if (entity instanceof LivingEntity living) {
                 syncToTracking(living);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static float getInvincibleHealth(@Nullable LivingEntity entity) {
@@ -91,9 +84,10 @@ public final class InvincibleHelper {
             UUID uuid = entity.getUUID();
             if (uuid != null) {
                 Float locked = LOCKED_HEALTH.get(uuid);
-                if (locked != null && locked > 0.0F) return locked; 
+                if (locked != null && locked > 0.0F) return locked;
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
         return entity.getHealth() > 0.0F ? entity.getHealth() : 20.0F;
     }
 
@@ -104,7 +98,8 @@ public final class InvincibleHelper {
             if (uuid != null && health > 0.0F) {
                 LOCKED_HEALTH.put(uuid, health);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static boolean isHealBlocked(@Nullable Entity entity) {
@@ -124,12 +119,12 @@ public final class InvincibleHelper {
             if (uuid != null) {
                 if (blocked) HEAL_BLOCKED.add(uuid);
                 else HEAL_BLOCKED.remove(uuid);
-
                 if (entity instanceof LivingEntity living) {
                     syncToTracking(living);
                 }
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static boolean isRemoveBypass(@Nullable Entity entity) {
@@ -159,7 +154,8 @@ public final class InvincibleHelper {
             Set<UUID> bypassSet = entity.level().isClientSide() ? CLIENT_REMOVE_BYPASS : SERVER_REMOVE_BYPASS;
             if (bypass) bypassSet.add(uuid);
             else bypassSet.remove(uuid);
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static boolean isDummy(@Nullable Entity entity) {
@@ -170,7 +166,6 @@ public final class InvincibleHelper {
         if (entity == null) return;
         entity.dead = false;
         entity.deathTime = 0;
-
         if (entity.getPose() == Pose.DYING) {
             entity.setPose(Pose.STANDING);
         }
@@ -181,7 +176,6 @@ public final class InvincibleHelper {
             boolean invincible = isInvincible(entity);
             float targetHp = getInvincibleHealth(entity);
             boolean healBlocked = isHealBlocked(entity);
-
             ModMessages.INSTANCE.send(
                     PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> entity),
                     new ClientboundDecaySyncPacket(
