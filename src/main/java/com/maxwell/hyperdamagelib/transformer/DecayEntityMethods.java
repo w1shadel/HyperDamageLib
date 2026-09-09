@@ -35,6 +35,12 @@ public final class DecayEntityMethods {
         return obj instanceof Entity entity && InvincibleHelper.isInvincible(entity);
     }
 
+    public static boolean hdl$shouldCancelRemovePlayer(net.minecraft.server.level.DistanceManager distanceManager, net.minecraft.core.SectionPos sectionPos) {
+        if (distanceManager == null || sectionPos == null) return true;
+        long chunkKey = sectionPos.chunk().toLong();
+        return distanceManager.playersPerChunk.get(chunkKey) == null;
+    }
+
     public static boolean hdl$returnFalse(Object obj) {
         return false;
     }
@@ -140,10 +146,8 @@ public final class DecayEntityMethods {
             if (DecayDamageUtil.isForceDamage(living)) {
                 return false;
             }
-            // ★★★ 通常時の修復: 生物は HP > 0 かつ removalReason == null で判定する（バニラ完全準拠）
             return living.getRemovalReason() == null && getRawHp(living) > 0.0F;
         }
-
         if (obj instanceof Entity entity) {
             if (isP(entity)) {
                 return !InvincibleHelper.isRemoveBypass(entity);
@@ -153,7 +157,6 @@ public final class DecayEntityMethods {
             }
             return entity.getRemovalReason() == null;
         }
-
         if (obj instanceof Thread thread) {
             return thread.isAlive();
         }
@@ -281,73 +284,64 @@ public final class DecayEntityMethods {
     public static void hdl$fixAlreadyTrackedEntity(ChunkMap chunkMap, Entity entity) {
         if (chunkMap == null || entity == null) return;
         try {
-
             chunkMap.entityMap.remove(entity.getId());
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
 
     public static boolean hdl$shouldCancelTick(Object obj) {
         if (obj == null) return true;
-
         if (obj instanceof Entity entity) {
             if (entity.level() instanceof ServerLevel serverLevel) {
                 PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);
                 if (data != null && data.isPurged(entity)) {
-
                     DecayForceKillHelper.purgeBossBars(entity, serverLevel);
                     return true;
                 }
             }
             return DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || entity.getRemovalReason() != null;
         }
-
         if (isControllerSilenced(obj)) {
-
             try {
                 net.minecraft.server.MinecraftServer server = net.minecraftforge.server.ServerLifecycleHooks.getCurrentServer();
                 if (server != null) {
                     DecayForceKillHelper.purgeBossBars(obj, server.overworld());
                 }
-            } catch (Throwable ignored) {}
-
-            return true; 
+            } catch (Throwable ignored) {
+            }
+            return true;
         }
-
         return false;
     }
+
     public static boolean hdl$shouldRejectEntityAdd(Object entityAccessObj) {
         if (entityAccessObj instanceof Entity entity) {
-
             if (DecayDamageUtil.isForceDamage(entity)) {
                 return true;
             }
-
             if (entity.level() instanceof ServerLevel serverLevel) {
                 try {
                     PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);
                     if (data != null && data.isPurged(entity)) {
                         return true;
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                }
             }
         }
         return false;
     }
+
     public static boolean hdl$shouldHideFromSpatialQuery(Entity entity) {
         if (entity == null) return false;
-
         if (isP(entity)) {
-            return true; 
+            return true;
         }
-
         return false;
     }
 
-
-    
     public static <T> Predicate<T> hdl$wrapPredicate(Predicate<T> original) {
         return (target) -> {
-
             if (target instanceof Entity entity && isP(entity)) {
                 return false;
             }
@@ -355,10 +349,8 @@ public final class DecayEntityMethods {
         };
     }
 
-    
     public static <T> Consumer<T> hdl$wrapConsumer(Consumer<T> original) {
         return (target) -> {
-
             if (target instanceof Entity entity && isP(entity)) {
                 return;
             }
@@ -367,7 +359,6 @@ public final class DecayEntityMethods {
             }
         };
     }
-
 
     public static float sanitizeHookHealth(Object inst, float val, Object ent, Object p) {
         return (ent instanceof LivingEntity le) ? hdl$getHealth(le) : val;
@@ -401,40 +392,35 @@ public final class DecayEntityMethods {
             if (hp != null && !Float.isNaN(hp)) {
                 return hp;
             }
-        } catch (Throwable ignored) {}
-
+        } catch (Throwable ignored) {
+        }
         try {
             return e.deathTime > 0 ? 0.0F : e.getHealth();
         } catch (Throwable ignored) {
             return 0.0F;
         }
     }
+
     public static boolean hdl$handleUltraBypassHurt(Entity entity, net.minecraft.world.damagesource.DamageSource source, float amount) {
         if (entity == null || source == null || amount <= 0.0F) {
             return false;
         }
-
         if (isP(entity)) {
-            return true; 
+            return true;
         }
-
         if (!(entity instanceof LivingEntity livingTarget) || entity.level().isClientSide()) {
             return false;
         }
-
         if (DecayDamageUtil.isBypassDecay(livingTarget)) {
             return false;
         }
-
         if (source.is(DecayDamageUtil.ULTRA_BYPASS_DAMAGE) ||
                 source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.EROSION) ||
                 source.is(com.maxwell.hyperdamagelib.init.ModDamageTypes.PENETRATE)) {
-
             DecayDamageUtil.applyCustomDamage(livingTarget, source, amount);
-            return true; 
+            return true;
         }
-
-        return false; 
+        return false;
     }
 
     private static class ProtectedEntityMap<V> implements Int2ObjectMap<V> {

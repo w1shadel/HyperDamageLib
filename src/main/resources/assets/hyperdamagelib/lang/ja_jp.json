@@ -4,6 +4,7 @@
   "item.hyperdamagelib.void_shred_sword": "虚空断裂の剣",
   "death.attack.void_shred": "%1$sは空間の裂け目に切り刻まれた。",
   "death.attack.erosion": "%1$sは消滅した。",
+  "death.attack.penetrate": "%1$sは貫通された。",
   "item.hyperdamagelib.erosion_sword.tooltip_1": "§7左クリック：前方の空間を薙ぎ払い、最大HP上限を永続的に削る。",
   "item.hyperdamagelib.erosion_sword.tooltip_2": "§d攻撃ボーナス：範囲内の全員に防御無視の §f15.00 絶対ダメージ §dを直接付与。",
   "item.hyperdamagelib.erosion_sword.tooltip_3": "§c右クリック：周囲6mの全員に絶対防御貫通の §f30.0 侵食衝撃波 §cを放つ。",

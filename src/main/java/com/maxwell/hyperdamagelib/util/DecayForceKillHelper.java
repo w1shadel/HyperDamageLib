@@ -3,8 +3,12 @@ package com.maxwell.hyperdamagelib.util;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.core.SectionPos;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerCombatKillPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
+import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -24,45 +28,96 @@ import java.util.*;
 
 public class DecayForceKillHelper {
     public static void decayForceKill(LivingEntity entity) {
+        decayForceKill(entity, DecayDamageUtil.getErosionSource(entity.level(), entity));
+    }
+
+    public static void decayForceKill(LivingEntity entity, DamageSource source) {
         if (entity.level().isClientSide()) return;
-
+        if (entity instanceof ServerPlayer serverPlayer) {
+            executePlayerKillHierarchy(serverPlayer, source);
+            return;
+        }
         DecayDamageUtil.markPermanentlyKilled(entity);
-
         try (var ignored1 = DecayDamageUtil.forceKillScope(entity)) {
             preventEntitySaving(entity);
             if (entity.level() instanceof ServerLevel serverLevel) {
                 PurgedEntitiesSavedData.get(serverLevel).markPurged(entity);
             }
-
             purgeBossBars(entity, entity.level());
             breakBrain(entity);
             neutralizeEntityFields(entity);
-
             try (var ignored2 = DecayDamageUtil.bypassScope(entity)) {
                 entity.setHealth(0.0F);
                 entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
             }
-
-            DamageSource erosion = DecayDamageUtil.getErosionSource(entity.level(), entity);
-            entity.die(erosion);
+            entity.die(source);
             dropAllForce(entity);
-
-            if (!(entity instanceof Player)) {
-                InvincibleHelper.setRemoveBypass(entity, true);
+            InvincibleHelper.setRemoveBypass(entity, true);
+            if (!entity.isRemoved()) {
                 entity.remove(Entity.RemovalReason.KILLED);
-                entity.discard();
-                removeFromMemory(entity);
-                breakControllers(entity);
-                purgeEntityFromStaticCaches(entity);
-                purgeFromExternalLists(entity);
             }
+            entity.discard();
+            removeFromMemory(entity);
+            breakControllers(entity);
+            purgeEntityFromStaticCaches(entity);
+            purgeFromExternalLists(entity);
+
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
+    private static void executePlayerKillHierarchy(ServerPlayer player, DamageSource source) {
+        if (player.dead) {
+            return;
+        }
+        try {
+            if (source.getEntity() instanceof LivingEntity attacker) {
+                player.setLastHurtByMob(attacker);
+                if (attacker instanceof Player p) {
+                    player.setLastHurtByPlayer(p);
+                }
+            }
+            player.getCombatTracker().recordDamage(source, 1000.0F);
+        } catch (Throwable ignored) {}
+
+        try {
+            player.die(source);
+        } catch (Throwable ignored) {}
+
+        if (player.dead) {
+            return;
+        }
+        try (var ignored = DecayDamageUtil.bypassScope(player)) {
+            player.setHealth(0.0F);
+            try {
+                player.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            if (player.connection != null) {
+                player.connection.send(new ClientboundSetHealthPacket(
+                        0.0F,
+                        player.getFoodData().getFoodLevel(),
+                        player.getFoodData().getSaturationLevel()
+                ));
+            }
+            dropAllForce(player);
+            player.die(source);
+        } catch (Throwable ignored) {}
+
+        if (player.dead) {
+            return;
+        }
+        try {
+            if (player.server != null && player.isAlive()) {
+                player.server.getPlayerList().respawn(player, false);
+            }
+        } catch (Throwable ignored) {}
+    }
+
     public static void preventEntitySaving(Entity entity) {
-        if (entity == null) return;
+        if (entity == null || entity instanceof Player) return;
         try {
             entity.setRemoved(Entity.RemovalReason.KILLED);
             net.minecraft.nbt.CompoundTag persistentData = entity.getPersistentData();
@@ -72,12 +127,12 @@ public class DecayForceKillHelper {
                 }
             }
             entity.getTags().clear();
-
         } catch (Throwable ignored) {
         }
     }
 
     public static void breakBrain(LivingEntity entity) {
+        if (entity instanceof Player) return;
         try {
             entity.getBrain().clearMemories();
             if (entity instanceof Mob mob) {
@@ -384,27 +439,20 @@ public class DecayForceKillHelper {
 
     public static void dropAllForce(LivingEntity livingEntity) {
         if (livingEntity == null || livingEntity.level().isClientSide()) return;
-
         if (livingEntity instanceof Player player) {
             player.getInventory().dropAll();
             player.containerMenu.broadcastChanges();
             player.inventoryMenu.broadcastChanges();
         }
-
         List<Pair<EquipmentSlot, ItemStack>> emptySlotsList = new ArrayList<>();
-
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             ItemStack itemStack = livingEntity.getItemBySlot(slot);
             if (itemStack != null && !itemStack.isEmpty()) {
-
                 clearStackAndDrop(livingEntity, itemStack);
-
                 livingEntity.setItemSlot(slot, ItemStack.EMPTY);
                 emptySlotsList.add(Pair.of(slot, ItemStack.EMPTY));
             }
         }
-
-
         if (!emptySlotsList.isEmpty() && livingEntity.level() instanceof ServerLevel serverLevel) {
             ClientboundSetEquipmentPacket equipPacket =
                     new ClientboundSetEquipmentPacket(livingEntity.getId(), emptySlotsList);
@@ -422,19 +470,16 @@ public class DecayForceKillHelper {
     }
 
     public static void neutralizeEntityFields(LivingEntity entity) {
-        if (entity == null) return;
+        if (entity == null || entity instanceof Player) return;
         try {
             Class<?> clazz = entity.getClass();
             while (clazz != null && clazz != LivingEntity.class && clazz != Entity.class) {
                 for (Field f : clazz.getDeclaredFields()) {
                     if (Modifier.isStatic(f.getModifiers()) || Modifier.isFinal(f.getModifiers())) continue;
                     f.setAccessible(true);
-
                     if (f.getType() == net.minecraft.world.phys.Vec3.class) {
                         f.set(entity, null);
-                    }
-
-                    else if (Collection.class.isAssignableFrom(f.getType())) {
+                    } else if (Collection.class.isAssignableFrom(f.getType())) {
                         Object val = f.get(entity);
                         if (val instanceof Collection<?> col) {
                             try {
@@ -442,9 +487,7 @@ public class DecayForceKillHelper {
                             } catch (Throwable ignored) {
                             }
                         }
-                    }
-
-                    else if (f.getType() == int.class) {
+                    } else if (f.getType() == int.class) {
                         f.setInt(entity, 0);
                     }
                 }
@@ -462,6 +505,7 @@ public class DecayForceKillHelper {
             net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket removePacket =
                     new net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket(victim.getId());
             serverLevel.getChunkSource().chunkMap.broadcast(victim, removePacket);
+            serverLevel.getChunkSource().chunkMap.removeEntity(victim);
             victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
             victim.levelCallback = EntityInLevelCallback.NULL;
             PersistentEntitySectionManager<Entity> manager = serverLevel.entityManager;
@@ -487,11 +531,6 @@ public class DecayForceKillHelper {
                 manager.entityGetter = new LevelEntityGetterAdapter<>(newEntityLookup, sectionStorage);
             }
             serverLevel.entityTickList.remove(victim);
-            serverLevel.entityTickList.active.remove(victim.getId());
-            serverLevel.entityTickList.passive.remove(victim.getId());
-            if (serverLevel.entityTickList.iterated != null) {
-                serverLevel.entityTickList.iterated.remove(victim.getId());
-            }
             serverLevel.getChunkSource().removeEntity(victim);
         }
     }

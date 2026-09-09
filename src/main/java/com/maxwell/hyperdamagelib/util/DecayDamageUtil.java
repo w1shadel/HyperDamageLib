@@ -44,6 +44,7 @@ public final class DecayDamageUtil {
 
     private DecayDamageUtil() {
     }
+
     public static void markPermanentlyKilled(Entity entity) {
         if (entity == null) return;
         UUID uuid = entity.getUUID();
@@ -51,6 +52,7 @@ public final class DecayDamageUtil {
             FORCE_KILL_TARGETS.add(uuid);
         }
     }
+
     public static AutoCloseable bypassScope(@Nullable Entity entity) {
         if (entity == null) return () -> {
         };
@@ -182,6 +184,7 @@ public final class DecayDamageUtil {
             } else {
                 nextHealth = Math.max(0.0F, currentHealth - finalDamage);
             }
+            target.getCombatTracker().recordDamage(source, finalDamage);
             target.setHealth(nextHealth);
             sendDirectDataPacket(target, nextHealth);
             target.level().broadcastDamageEvent(target, source);
@@ -193,14 +196,7 @@ public final class DecayDamageUtil {
                 } catch (Throwable ignored2) {
                 }
                 if (!hasTotem) {
-                    if (target instanceof ServerPlayer sp && sp.connection != null) {
-                        sp.connection.send(new ClientboundPlayerCombatKillPacket(sp.getId(), sp.getCombatTracker().getDeathMessage()));
-                        DecayForceKillHelper.decayForceKill(target);
-                    } else {
-                        DecayForceKillHelper.decayForceKill(target);
-                        InvincibleHelper.setRemoveBypass(target, true);
-                        target.remove(Entity.RemovalReason.KILLED);
-                    }
+                    DecayForceKillHelper.decayForceKill(target, source);
                 }
             } else {
                 try {

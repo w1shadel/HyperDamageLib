@@ -11,7 +11,7 @@ import net.minecraftforge.registries.RegistryObject;
 
 public class ModTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, HDL.MODID);
-    public static final RegistryObject<CreativeModeTab> PRIME_TAB = CREATIVE_TABS.register("prime_tab", () ->
+    public static final RegistryObject<CreativeModeTab> HDL_TAB = CREATIVE_TABS.register("hdl_tab", () ->
             CreativeModeTab.builder()
                     .title(Component.translatable("creative_tab.hyperdamagelib.prime_tab"))
                     .icon(() -> new ItemStack(ModItems.EROSION_SWORD.isPresent() ? ModItems.EROSION_SWORD.get() : Blocks.BARRIER.asItem()))

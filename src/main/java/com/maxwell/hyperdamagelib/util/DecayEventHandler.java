@@ -59,20 +59,14 @@ public class DecayEventHandler {
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
-
         Entity entity = event.getEntity();
         if (entity instanceof Player) return;
-
         if (event.getLevel() instanceof ServerLevel serverLevel) {
             PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);
-
             if (data != null && data.isPurged(entity)) {
                 event.setCanceled(true);
-
                 if (entity instanceof LivingEntity living) {
-
                     DecayForceKillHelper.purgeBossBars(living, serverLevel);
-
                     DecayForceKillHelper.breakControllers(living);
                     DecayForceKillHelper.breakBrain(living);
                     DecayForceKillHelper.removeFromMemory(living);

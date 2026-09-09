@@ -54,5 +54,6 @@
   "commands.hdl.dummy.summary.total": "§fTotal Damage: %s",
   "commands.hdl.dummy.summary.duration": "§fDuration: %s seconds",
   "commands.hdl.dummy.summary.avg_dps": "§fAverage DPS: %s",
-  "commands.hdl.dummy.summary.footer": "§d================================"
+  "commands.hdl.dummy.summary.footer": "§d================================",
+  "death.attack.penetrate": "%1$s has been penetrated."
 }

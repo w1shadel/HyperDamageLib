@@ -43,7 +43,7 @@ public class HDL {
     }
 
     private void addCreativeContents(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event) {
-        if (event.getTab() == ModTabs.PRIME_TAB.get()) {
+        if (event.getTab() == ModTabs.HDL_TAB.get()) {
             ModItems.ITEMS.getEntries().forEach(item -> event.accept(item.get()));
         }
     }

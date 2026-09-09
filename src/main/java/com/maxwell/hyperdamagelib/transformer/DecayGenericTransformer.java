@@ -31,6 +31,28 @@ public final class DecayGenericTransformer implements Opcodes {
                 }
             }
         }
+        if (classNode.name.equals("net/minecraft/server/level/DistanceManager")) {
+            for (MethodNode method : classNode.methods) {
+                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
+                if (method.instructions == null || method.instructions.getFirst() == null) continue;
+                if ((method.name.equals("removePlayer") || method.name.equals("m_140828_")) &&
+                        method.desc.equals("(Lnet/minecraft/core/SectionPos;Lnet/minecraft/server/level/ServerPlayer;)V")) {
+                    LabelNode skip = new LabelNode();
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new VarInsnNode(ALOAD, 1));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldCancelRemovePlayer",
+                            "(Lnet/minecraft/server/level/DistanceManager;Lnet/minecraft/core/SectionPos;)Z", false));
+                    list.add(new JumpInsnNode(IFEQ, skip));
+                    list.add(new InsnNode(RETURN));
+                    list.add(skip);
+                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
+            }
+        }
         if (classNode.name.equals("net/minecraft/world/entity/Entity")) {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
@@ -92,23 +114,18 @@ public final class DecayGenericTransformer implements Opcodes {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
                 if (method.instructions == null || method.instructions.getFirst() == null) continue;
-
                 if ((method.name.startsWith("add") || method.name.equals("m_157540_") || method.name.equals("m_157544_") || method.name.equals("m_157538_")) &&
                         method.desc.contains("EntityAccess;")) {
-
                     LabelNode skip = new LabelNode();
                     InsnList list = new InsnList();
-                    list.add(new VarInsnNode(ALOAD, 1)); 
+                    list.add(new VarInsnNode(ALOAD, 1));
                     list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldRejectEntityAdd", "(Ljava/lang/Object;)Z", false));
                     list.add(new JumpInsnNode(IFEQ, skip));
-
-                    list.add(new InsnNode(ICONST_0)); 
-                    list.add(new InsnNode(IRETURN));  
-
+                    list.add(new InsnNode(ICONST_0));
+                    list.add(new InsnNode(IRETURN));
                     list.add(skip);
                     list.add(new FrameNode(F_SAME, 0, null, 0, null));
                     method.instructions.insertBefore(method.instructions.getFirst(), list);
-
                     method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
@@ -139,17 +156,13 @@ public final class DecayGenericTransformer implements Opcodes {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
                 if (method.instructions == null || method.instructions.getFirst() == null) continue;
-
                 if ((method.name.equals("addEntity") || method.name.equals("m_140199_")) &&
                         method.desc.equals("(Lnet/minecraft/world/entity/Entity;)V")) {
-
                     InsnList list = new InsnList();
-                    list.add(new VarInsnNode(ALOAD, 0)); 
-                    list.add(new VarInsnNode(ALOAD, 1)); 
-
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new VarInsnNode(ALOAD, 1));
                     list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$fixAlreadyTrackedEntity",
                             "(Lnet/minecraft/server/level/ChunkMap;Lnet/minecraft/world/entity/Entity;)V", false));
-
                     method.instructions.insertBefore(method.instructions.getFirst(), list);
                     method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
@@ -179,56 +192,45 @@ public final class DecayGenericTransformer implements Opcodes {
         if (classNode.name.equals("net/minecraft/world/level/entity/LevelEntityGetterAdapter")) {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
-
                 if ((method.name.equals("get") || method.name.equals("m_156767_")) &&
                         method.desc.contains("Consumer;")) {
-
                     for (AbstractInsnNode insn : method.instructions.toArray()) {
                         if (insn instanceof MethodInsnNode mi && mi.name.equals("accept") && mi.owner.equals("java/util/function/Consumer")) {
                             LabelNode skip = new LabelNode();
                             InsnList list = new InsnList();
-                            list.add(new InsnNode(DUP)); 
+                            list.add(new InsnNode(DUP));
                             list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldHideFromSpatialQuery", "(Lnet/minecraft/world/entity/Entity;)Z", false));
-                            list.add(new JumpInsnNode(IFNE, skip)); 
-
+                            list.add(new JumpInsnNode(IFNE, skip));
                             method.instructions.insertBefore(insn, list);
-
                             InsnList popList = new InsnList();
                             popList.add(skip);
                             popList.add(new FrameNode(F_SAME1, 0, null, 1, new Object[]{"java/lang/Object"}));
-                            popList.add(new InsnNode(POP)); 
-                            popList.add(new InsnNode(POP2)); 
-
+                            popList.add(new InsnNode(POP));
+                            popList.add(new InsnNode(POP2));
                             modified = true;
                         }
                     }
                 }
             }
         }
-
         if (classNode.name.equals("net/minecraft/world/level/entity/EntitySection")) {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
-
                 if (method.name.startsWith("getEntities") || method.name.equals("m_260830_") || method.name.equals("m_188350_")) {
                     for (AbstractInsnNode insn : method.instructions.toArray()) {
-
                         if (insn instanceof MethodInsnNode mi && mi.name.equals("add") && mi.owner.equals("java/util/List")) {
                             LabelNode skipAdd = new LabelNode();
                             InsnList list = new InsnList();
-                            list.add(new InsnNode(DUP)); 
+                            list.add(new InsnNode(DUP));
                             list.add(new TypeInsnNode(CHECKCAST, "net/minecraft/world/entity/Entity"));
                             list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldHideFromSpatialQuery", "(Lnet/minecraft/world/entity/Entity;)Z", false));
-                            list.add(new JumpInsnNode(IFNE, skipAdd)); 
-
+                            list.add(new JumpInsnNode(IFNE, skipAdd));
                             method.instructions.insertBefore(insn, list);
-
                             InsnList skipList = new InsnList();
                             skipList.add(skipAdd);
                             skipList.add(new FrameNode(F_SAME1, 0, null, 2, new Object[]{"java/util/List", "java/lang/Object"}));
-                            skipList.add(new InsnNode(POP2)); 
+                            skipList.add(new InsnNode(POP2));
                             method.instructions.insert(insn, skipList);
-
                             method.maxStack = Math.max(method.maxStack, 4);
                             modified = true;
                         }
@@ -242,22 +244,16 @@ public final class DecayGenericTransformer implements Opcodes {
                     method.name.equals("saveWithoutId") || method.name.equals("m_20223_")) {
                 continue;
             }
-
             for (AbstractInsnNode insn : method.instructions.toArray()) {
                 if (insn instanceof MethodInsnNode mi) {
-
                     if ((mi.owner.equals("net/minecraft/world/level/Level") || mi.owner.equals("net/minecraft/server/level/ServerLevel")) &&
                             (mi.name.equals("getEntities") || mi.name.equals("getEntitiesOfClass") || mi.name.startsWith("m_")) &&
                             mi.desc.contains("Ljava/util/function/Predicate;)")) {
-
                         MethodInsnNode wrapCall = new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$wrapPredicate",
                                 "(Ljava/util/function/Predicate;)Ljava/util/function/Predicate;", false);
                         method.instructions.insertBefore(mi, wrapCall);
                         modified = true;
-                    }
-
-                    else if (mi.name.equals("get") && mi.desc.contains("Ljava/util/function/Consumer;)V")) {
-
+                    } else if (mi.name.equals("get") && mi.desc.contains("Ljava/util/function/Consumer;)V")) {
                         MethodInsnNode wrapCall = new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$wrapConsumer",
                                 "(Ljava/util/function/Consumer;)Ljava/util/function/Consumer;", false);
                         method.instructions.insertBefore(mi, wrapCall);
