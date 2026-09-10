@@ -60,6 +60,11 @@ public class DecayEventHandler {
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         Entity entity = event.getEntity();
+        if (!(entity.entityData instanceof ProtectedSynchedEntityData)) {
+            try {
+                entity.entityData = new ProtectedSynchedEntityData(entity.entityData, entity);
+            } catch (Throwable ignored) {}
+        }
         if (entity instanceof Player) return;
         if (event.getLevel() instanceof ServerLevel serverLevel) {
             PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);

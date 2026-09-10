@@ -111,18 +111,40 @@ public final class DecayEntityMethods {
         }
         return pHealth;
     }
-
+    private static final ThreadLocal<Boolean> RECURSION_GUARD = ThreadLocal.withInitial(() -> false);
     public static float hdl$getHealth(Object obj) {
         if (obj instanceof LivingEntity entity) {
+
             if (isP(entity)) {
-                return getRawHp(entity);
+                return hdl$getImmortalHealth(entity);
             }
+
             if (DecayDamageUtil.isForceDamage(entity)) {
                 return -Float.MAX_VALUE;
             }
-            return getRawHp(entity);
+
+            if (RECURSION_GUARD.get()) {
+                return getRawDataHp(entity);
+            }
+            RECURSION_GUARD.set(true);
+            try {
+                return getRawDataHp(entity);
+            } finally {
+                RECURSION_GUARD.set(false);
+            }
         }
         return 20.0F;
+    }
+
+    private static float getRawDataHp(LivingEntity entity) {
+        try {
+            Float hp = entity.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+            if (hp != null && !Float.isNaN(hp)) {
+                return hp;
+            }
+        } catch (Throwable ignored) {}
+
+        return entity.getMaxHealth();
     }
 
     public static boolean hdl$isDeadOrDying(Object obj) {
@@ -359,9 +381,18 @@ public final class DecayEntityMethods {
             }
         };
     }
-
     public static float sanitizeHookHealth(Object inst, float val, Object ent, Object p) {
-        return (ent instanceof LivingEntity le) ? hdl$getHealth(le) : val;
+        if (ent instanceof LivingEntity le) {
+            if (isP(le)) {
+                return hdl$getImmortalHealth(le);
+            }
+            if (DecayDamageUtil.isForceDamage(le)) {
+                return -Float.MAX_VALUE;
+            }
+
+            return val;
+        }
+        return val;
     }
 
     public static boolean sanitizeHookDeadOrDying(Object inst, boolean val, Object ent, Object p) {

@@ -24,6 +24,7 @@ public final class InvincibleHelper {
     private static final Set<UUID> SUPER_INVINCIBLE = ConcurrentHashMap.newKeySet();
     private static final Map<UUID, Float> LOCKED_HEALTH = new ConcurrentHashMap<>();
     private static final Set<UUID> HEAL_BLOCKED = ConcurrentHashMap.newKeySet();
+    private static final Set<UUID> FORCE_UNINVINCIBLE_COOLDOWN = ConcurrentHashMap.newKeySet();
 
     private InvincibleHelper() {
     }
@@ -45,45 +46,68 @@ public final class InvincibleHelper {
             return false;
         }
     }
-
     public static void setInvincible(@Nullable Entity entity, boolean invincible) {
         if (entity == null) return;
         try {
             UUID uuid = entity.getUUID();
             if (uuid == null) return;
+
             if (invincible) {
-                SUPER_INVINCIBLE.add(uuid);
-                if (invincible) {
-                    if (entity != null && !(entity.entityData instanceof ProtectedSynchedEntityData)) {
-                        try {
-                            entity.entityData = new ProtectedSynchedEntityData(entity.entityData, entity);
-                        } catch (Throwable ignored) {}
-                    }
+
+                if (FORCE_UNINVINCIBLE_COOLDOWN.contains(uuid)) {
+                    return;
                 }
+
                 if (entity instanceof LivingEntity living) {
-                    float currentHp = living.getHealth();
-                    if (currentHp <= 0.0F || Float.isNaN(currentHp)) {
-                        currentHp = 1.0F;
-                    }
+                    Float rawHp = null;
+                    try {
+                        rawHp = living.getEntityData().get(LivingEntityAccessor.getDataHealthId());
+                    } catch (Throwable ignored) {}
+
+                    float currentHp = (rawHp != null && !Float.isNaN(rawHp) && rawHp > 0.0F)
+                            ? rawHp : living.getHealth();
                     currentHp = Math.min(currentHp, living.getMaxHealth());
+
                     LOCKED_HEALTH.put(uuid, currentHp);
+                }
+
+                SUPER_INVINCIBLE.add(uuid);
+
+                if (!(entity.entityData instanceof ProtectedSynchedEntityData)) {
+                    try {
+                        entity.entityData = new ProtectedSynchedEntityData(entity.entityData, entity);
+                    } catch (Throwable ignored) {}
+                }
+
+                if (entity instanceof LivingEntity living) {
                     living.setInvulnerable(true);
                     keepAlive(living);
-                    try (var ignored = DecayDamageUtil.bypassScope(living)) {
-                        living.setHealth(currentHp);
-                        living.getEntityData().set(LivingEntityAccessor.getDataHealthId(), currentHp);
-                    }
                 }
             } else {
+
                 SUPER_INVINCIBLE.remove(uuid);
                 LOCKED_HEALTH.remove(uuid);
-                entity.setInvulnerable(false);
+
+                FORCE_UNINVINCIBLE_COOLDOWN.add(uuid);
+                TaskScheduler.schedule(() -> {
+                    FORCE_UNINVINCIBLE_COOLDOWN.remove(uuid);
+                }, 10);
+
+                if (entity instanceof LivingEntity living) {
+                    living.setInvulnerable(false);
+                }
+
+                if (entity.entityData instanceof ProtectedSynchedEntityData protectedData) {
+                    try {
+                        entity.entityData = protectedData.getOriginal();
+                    } catch (Throwable ignored) {}
+                }
             }
+
             if (entity instanceof LivingEntity living) {
                 syncToTracking(living);
             }
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     public static float getInvincibleHealth(@Nullable LivingEntity entity) {

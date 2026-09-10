@@ -69,43 +69,12 @@ public final class DecayGenericTransformer implements Opcodes {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
                 if (method.instructions == null || method.instructions.getFirst() == null) continue;
-                if ((method.name.equals("setHealth") || method.name.equals("m_21153_")) && method.desc.equals("(F)V")) {
-                    InsnList list = new InsnList();
-                    list.add(new VarInsnNode(ALOAD, 0));
-                    list.add(new VarInsnNode(FLOAD, 1));
-                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$hookSetHealth", "(Ljava/lang/Object;F)F", false));
-                    list.add(new VarInsnNode(FSTORE, 1));
-                    method.instructions.insertBefore(method.instructions.getFirst(), list);
-                    method.maxStack = Math.max(method.maxStack, 2);
-                    modified = true;
-                } else if ((method.name.equals("tick") || method.name.equals("m_8119_") ||
+                if ((method.name.equals("tick") || method.name.equals("m_8119_") ||
                         method.name.equals("baseTick") || method.name.equals("m_6075_")) && method.desc.equals("()V")) {
                     InsnList list = new InsnList();
                     list.add(new VarInsnNode(ALOAD, 0));
                     list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$forceTickInvulnerable", "(Lnet/minecraft/world/entity/LivingEntity;)V", false));
                     method.instructions.insertBefore(method.instructions.getFirst(), list);
-                    modified = true;
-                }
-            }
-        }
-        if (isTargetEntity(classNode.name)) {
-            for (MethodNode method : classNode.methods) {
-                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
-                if ((method.name.equals("hurt") || method.name.equals("m_6469_")) &&
-                        method.desc.equals("(Lnet/minecraft/world/damagesource/DamageSource;F)Z")) {
-                    LabelNode skip = new LabelNode();
-                    InsnList list = new InsnList();
-                    list.add(new VarInsnNode(ALOAD, 0));
-                    list.add(new VarInsnNode(ALOAD, 1));
-                    list.add(new VarInsnNode(FLOAD, 2));
-                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$handleUltraBypassHurt", "(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/world/damagesource/DamageSource;F)Z", false));
-                    list.add(new JumpInsnNode(IFEQ, skip));
-                    list.add(new InsnNode(ICONST_1));
-                    list.add(new InsnNode(IRETURN));
-                    list.add(skip);
-                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
-                    method.instructions.insertBefore(method.instructions.getFirst(), list);
-                    method.maxStack = Math.max(method.maxStack, 3);
                     modified = true;
                 }
             }

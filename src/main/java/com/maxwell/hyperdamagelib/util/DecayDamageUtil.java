@@ -195,7 +195,11 @@ public final class DecayDamageUtil {
             }
 
             target.getCombatTracker().recordDamage(source, finalDamage);
-            target.setHealth(nextHealth);
+            if (target.entityData instanceof com.maxwell.hyperdamagelib.transformer.ProtectedSynchedEntityData protectedData) {
+                protectedData.hdl$forceSetHealth(nextHealth);
+            } else {
+                target.getEntityData().set(LivingEntityAccessor.getDataHealthId(), nextHealth, true);
+            }
             sendDirectDataPacket(target, nextHealth);
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
