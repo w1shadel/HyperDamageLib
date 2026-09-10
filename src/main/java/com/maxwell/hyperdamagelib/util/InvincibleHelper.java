@@ -4,6 +4,7 @@ import com.maxwell.hyperdamagelib.entity.MeasurementDummyEntity;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
+import com.maxwell.hyperdamagelib.transformer.ProtectedSynchedEntityData;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -52,6 +53,13 @@ public final class InvincibleHelper {
             if (uuid == null) return;
             if (invincible) {
                 SUPER_INVINCIBLE.add(uuid);
+                if (invincible) {
+                    if (entity != null && !(entity.entityData instanceof ProtectedSynchedEntityData)) {
+                        try {
+                            entity.entityData = new ProtectedSynchedEntityData(entity.entityData, entity);
+                        } catch (Throwable ignored) {}
+                    }
+                }
                 if (entity instanceof LivingEntity living) {
                     float currentHp = living.getHealth();
                     if (currentHp <= 0.0F || Float.isNaN(currentHp)) {

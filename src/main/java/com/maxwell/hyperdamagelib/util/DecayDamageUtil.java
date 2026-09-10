@@ -138,19 +138,25 @@ public final class DecayDamageUtil {
     }
 
     public static void applyCustomDamage(LivingEntity target, DamageSource source, float rawAmount) {
+        applyCustomDamage(target, source, rawAmount, false); 
+    }
+    public static void applyCustomDamage(LivingEntity target, DamageSource source, float rawAmount, boolean forceKill) {
         if (target.level().isClientSide() || rawAmount <= 0.0F) return;
         if (target instanceof MeasurementDummyEntity dummy) {
             dummy.recordDamageAbsolute(source, rawAmount);
             return;
         }
         if (InvincibleHelper.isInvincible(target)) return;
+
         LivingEntityAccessor livAcc = (LivingEntityAccessor) target;
         EntityAccessor entAcc = (EntityAccessor) target;
         float finalDamage = rawAmount;
         float targetMaxHp = (float) target.getAttributeValue(Attributes.MAX_HEALTH);
+
         if (Float.isNaN(targetMaxHp) || Float.isInfinite(targetMaxHp) || targetMaxHp <= 0.0F) {
             targetMaxHp = 20.0F;
         }
+
         if (source.is(ModDamageTypes.PENETRATE)) {
             int invTime = entAcc.getInvulnerableTime();
             float lastHurt = livAcc.getLastHurt();
@@ -173,44 +179,57 @@ public final class DecayDamageUtil {
         } else if (source.is(ModDamageTypes.EROSION)) {
             finalDamage = rawAmount;
         }
+
         if (finalDamage <= 0.0F) return;
+
         try (var ignored = bypassScope(target)) {
             Float rawDataHp = target.getEntityData().get(LivingEntityAccessor.getDataHealthId());
             float currentHealth = (rawDataHp != null && !Float.isNaN(rawDataHp) && !Float.isInfinite(rawDataHp))
                     ? rawDataHp : targetMaxHp;
+
             float nextHealth;
             if (finalDamage >= Float.MAX_VALUE / 2 || Float.isInfinite(finalDamage)) {
                 nextHealth = 0.0F;
             } else {
                 nextHealth = Math.max(0.0F, currentHealth - finalDamage);
             }
+
             target.getCombatTracker().recordDamage(source, finalDamage);
             target.setHealth(nextHealth);
             sendDirectDataPacket(target, nextHealth);
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
+
+
+
             if (nextHealth <= 0.0F) {
                 boolean hasTotem = false;
                 try {
                     hasTotem = livAcc.invokeCheckTotemDeathProtection(source);
-                } catch (Throwable ignored2) {
-                }
+                } catch (Throwable ignored2) {}
+
                 if (!hasTotem) {
-                    DecayForceKillHelper.decayForceKill(target, source);
+                    if (forceKill) {
+
+                        DecayForceKillHelper.decayForceKill(target, source);
+                    } else {
+
+
+                        target.die(source);
+                    }
                 }
             } else {
                 try {
                     livAcc.invokePlayHurtSound(source);
-                } catch (Throwable ignored2) {
-                }
+                } catch (Throwable ignored2) {}
             }
+
             livAcc.setLastDamageSource(source);
             livAcc.setLastDamageStamp(target.level().getGameTime());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
-
     private static void sendDirectDataPacket(LivingEntity target, float nextHealth) {
         try {
             SynchedEntityData.DataValue<Float> healthValue = SynchedEntityData.DataValue.create(

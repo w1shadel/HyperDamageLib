@@ -4,6 +4,7 @@ import com.maxwell.hyperdamagelib.HDL;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.maxwell.hyperdamagelib.network.ModMessages;
 import com.maxwell.hyperdamagelib.network.client.ClientboundDecaySyncPacket;
+import com.maxwell.hyperdamagelib.transformer.ProtectedSynchedEntityData;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.FloatArgumentType;
@@ -55,7 +56,6 @@ public class DecayEventHandler {
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         InvincibleHelper.clearAllSessionData();
     }
-
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;

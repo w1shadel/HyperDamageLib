@@ -31,7 +31,7 @@ public class PenetrateSwordItem extends SwordItem {
             DamageSource source = DecayDamageUtil.getPenetrateSource(player.level(), player);
             DecayDamageUtil.applyCustomDamage(livingTarget, source, 18.0F);
         }
-        return true; // バニラの通常攻撃判定をキャンセルしてカスタムダメージのみ適用
+        return true; 
     }
 
     @Override
