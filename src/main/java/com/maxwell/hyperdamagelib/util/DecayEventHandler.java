@@ -56,6 +56,7 @@ public class DecayEventHandler {
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         InvincibleHelper.clearAllSessionData();
     }
+
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
@@ -63,7 +64,8 @@ public class DecayEventHandler {
         if (!(entity.entityData instanceof ProtectedSynchedEntityData)) {
             try {
                 entity.entityData = new ProtectedSynchedEntityData(entity.entityData, entity);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
         if (entity instanceof Player) return;
         if (event.getLevel() instanceof ServerLevel serverLevel) {

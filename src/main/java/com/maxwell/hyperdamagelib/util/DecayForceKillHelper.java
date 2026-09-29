@@ -3,35 +3,64 @@ package com.maxwell.hyperdamagelib.util;
 import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import com.mojang.datafixers.util.Pair;
 import net.minecraft.core.SectionPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundPlayerCombatKillPacket;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntArrayTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.protocol.game.ClientboundBossEventPacket;
+import net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEquipmentPacket;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.BossEvent;
 import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeMap;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.ai.goal.GoalSelector;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.*;
+import net.minecraft.world.level.storage.DimensionDataStorage;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
+@Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.FORGE)
 public class DecayForceKillHelper {
+    private static final AABB COLLAPSED_AABB = new AABB(0.0, -9999.0, 0.0, 0.0, -9999.0, 0.0);
+
+    @SubscribeEvent
+    public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+        Entity entity = event.getEntity();
+        if (entity == null || entity instanceof Player) return;
+        if (entity.level() instanceof ServerLevel serverLevel) {
+            PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(serverLevel);
+            if (data != null && data.isPurged(entity.getUUID())) {
+                event.setCanceled(true);
+                entity.discard();
+            }
+        }
+    }
+
     public static void decayForceKill(LivingEntity entity) {
         decayForceKill(entity, DecayDamageUtil.getErosionSource(entity.level(), entity));
     }
 
-    public static void decayForceKill(LivingEntity entity, DamageSource source) {
+    public static void decayForceKill(@NotNull LivingEntity entity, DamageSource source) {
         if (entity.level().isClientSide()) return;
         if (entity instanceof ServerPlayer serverPlayer) {
             executePlayerKillHierarchy(serverPlayer, source);
@@ -39,38 +68,309 @@ public class DecayForceKillHelper {
         }
         DecayDamageUtil.markPermanentlyKilled(entity);
         try (var ignored1 = DecayDamageUtil.forceKillScope(entity)) {
-            preventEntitySaving(entity);
-            if (entity.level() instanceof ServerLevel serverLevel) {
-                PurgedEntitiesSavedData.get(serverLevel).markPurged(entity);
+            Class<?> entityClass = entity.getClass();
+            String className = entityClass.getName();
+            boolean isCustomModEntity = isCustomModClass(className);
+            Set<UUID> targetUuids = isCustomModEntity ? extractAllLinkedUuids(entity) : Collections.singleton(entity.getUUID());
+            ClassLoader targetLoader = entityClass.getClassLoader();
+            Package targetPkg = entityClass.getPackage();
+            String pkgPrefix = isCustomModEntity && targetPkg != null ? getDomainRootPackage(targetPkg.getName()) : "";
+            if (isCustomModEntity) {
+                if (entity.level() instanceof ServerLevel serverLevel) {
+                    MinecraftServer server = serverLevel.getServer();
+                    PurgedEntitiesSavedData.get(serverLevel).markPurged(entity);
+                    for (UUID u : targetUuids) {
+                        PurgedEntitiesSavedData.get(serverLevel).markPurged(u);
+                    }
+                    if (!pkgPrefix.isEmpty()) {
+                        purgeSavedDataGeneric(server, targetUuids, targetLoader, pkgPrefix);
+                    }
+                }
             }
-            purgeBossBars(entity, entity.level());
-            breakBrain(entity);
-            neutralizeEntityFields(entity);
+            try {
+                purgeBossBars(entity, entity.level());
+            } catch (Throwable ignored) {
+            }
+            try {
+                cascadeKillLinkedEntities(entity, source, targetUuids);
+            } catch (Throwable ignored) {
+            }
             try (var ignored2 = DecayDamageUtil.bypassScope(entity)) {
                 entity.setHealth(0.0F);
-                entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
+                try {
+                    entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
+                } catch (Throwable ignored) {
+                }
+            } catch (Throwable ignored) {
             }
-            entity.die(source);
-            dropAllForce(entity);
-            InvincibleHelper.setRemoveBypass(entity, true);
-            if (!entity.isRemoved()) {
-                entity.remove(Entity.RemovalReason.KILLED);
+            try {
+                collapseBoundingBoxAndDimensions(entity);
+            } catch (Throwable ignored) {
             }
-            entity.discard();
-            removeFromMemory(entity);
-            breakControllers(entity);
-            purgeEntityFromStaticCaches(entity);
-            purgeFromExternalLists(entity);
+            try {
+                entity.die(source);
+            } catch (Throwable ignored) {
+            }
+            try {
+                dropAllForce(entity);
+            } catch (Throwable ignored) {
+            }
+            try {
+                setRemovalStateDirect(entity);
+                entity.discard();
+                if (entity.level() instanceof ServerLevel serverLevel) {
+                    ClientboundRemoveEntitiesPacket removePacket = new ClientboundRemoveEntitiesPacket(entity.getId());
+                    for (ServerPlayer player : serverLevel.getServer().getPlayerList().getPlayers()) {
+                        if (player.connection != null) {
+                            player.connection.send(removePacket);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            try {
+                removeFromMemory(entity);
+            } catch (Throwable ignored) {
+            }
+            try {
+                breakControllers(entity);
+            } catch (Throwable ignored) {
+            }
+            if (isCustomModEntity) {
+                try {
+                    purgeStaticDataInDomain(entityClass, targetUuids, targetLoader, pkgPrefix);
+                } catch (Throwable ignored) {
+                }
+                try {
+                    purgeFromExternalLists(entity);
+                } catch (Throwable ignored) {
+                }
+            }
+            try {
+                wipeEntireEntityState(entity);
+            } catch (Throwable ignored) {
+            }
 
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void executePlayerKillHierarchy(ServerPlayer player, DamageSource source) {
-        if (player.dead) {
-            return;
+    public static boolean isCustomModClass(String className) {
+        if (className == null) return false;
+        return !className.startsWith("net.minecraft.") &&
+                !className.startsWith("net.minecraftforge.") &&
+                !className.startsWith("com.mojang.") &&
+                !className.startsWith("java.") &&
+                !className.startsWith("javax.") &&
+                !className.startsWith("jdk.") &&
+                !className.startsWith("sun.") &&
+                !className.startsWith("org.spongepowered.") &&
+                !className.startsWith("cpw.mods.") &&
+                !className.startsWith("com.maxwell.hyperdamagelib.");
+    }
+
+    public static String getDomainRootPackage(String fullPackageName) {
+        if (fullPackageName == null || !isCustomModClass(fullPackageName)) return "";
+        String[] parts = fullPackageName.split("\\.");
+        if (parts.length >= 3) {
+            return parts[0] + "." + parts[1] + "." + parts[2];
+        } else if (parts.length >= 2) {
+            return parts[0] + "." + parts[1];
         }
+        return fullPackageName;
+    }
+
+    public static void purgeSavedDataGeneric(MinecraftServer server, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix) {
+        if (server == null || pkgPrefix.isEmpty()) return;
+        for (ServerLevel level : server.getAllLevels()) {
+            try {
+                DimensionDataStorage storage = level.getDataStorage();
+                Field cacheField = getFieldByType(storage.getClass(), Map.class);
+                if (cacheField == null) continue;
+                cacheField.setAccessible(true);
+                Map<?, ?> cache = (Map<?, ?>) cacheField.get(storage);
+                if (cache == null) continue;
+                for (Object savedDataObj : cache.values()) {
+                    if (savedDataObj == null) continue;
+                    boolean modified = purgeMapsAndCollectionsInObject(savedDataObj, targetUuids, loader, pkgPrefix, server);
+                    if (modified && savedDataObj instanceof net.minecraft.world.level.saveddata.SavedData sd) {
+                        sd.setDirty();
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static boolean purgeMapsAndCollectionsInObject(Object target, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix, MinecraftServer server) {
+        if (target == null || pkgPrefix.isEmpty()) return false;
+        boolean modified = false;
+        Class<?> clazz = target.getClass();
+        while (clazz != null && clazz != Object.class) {
+            for (Field f : clazz.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(target);
+                    if (val == null) continue;
+                    if (BossEvent.class.isAssignableFrom(f.getType()) || val instanceof BossEvent) {
+                        purgeSingleBossEvent(val, server);
+                        f.set(target, null);
+                        modified = true;
+                        continue;
+                    }
+                    if (val instanceof Map<?, ?> map) {
+                        int sizeBefore = map.size();
+                        for (Object entryVal : map.values()) {
+                            if (entryVal != null && entryVal.getClass().getName().startsWith(pkgPrefix)) {
+                                purgeBossBarsFromObjectFields(entryVal, server);
+                            }
+                        }
+                        map.entrySet().removeIf(entry -> {
+                            Object v = entry.getValue();
+                            return v != null && v.getClass().getName().startsWith(pkgPrefix);
+                        });
+                        if (map.size() != sizeBefore) modified = true;
+
+                    } else if (val instanceof Collection<?> col) {
+                        int sizeBefore = col.size();
+                        for (Object item : col) {
+                            if (item != null && item.getClass().getName().startsWith(pkgPrefix)) {
+                                purgeBossBarsFromObjectFields(item, server);
+                            }
+                        }
+                        col.removeIf(item -> item != null && item.getClass().getName().startsWith(pkgPrefix));
+                        if (col.size() != sizeBefore) modified = true;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return modified;
+    }
+
+    public static void purgeStaticDataInDomain(Class<?> startClass, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix) {
+        if (startClass == null || pkgPrefix.isEmpty()) return;
+        Set<Class<?>> scannedClasses = new HashSet<>();
+        collectReferencedDomainClasses(startClass, scannedClasses, pkgPrefix);
+        for (Class<?> clazz : scannedClasses) {
+            for (Field f : clazz.getDeclaredFields()) {
+                if (!Modifier.isStatic(f.getModifiers())) continue;
+                try {
+                    f.setAccessible(true);
+                    Object staticObj = f.get(null);
+                    if (staticObj instanceof Map<?, ?> map) {
+                        map.entrySet().removeIf(e ->
+                                targetUuids.contains(e.getKey()) ||
+                                        targetUuids.contains(e.getValue()) ||
+                                        (e.getValue() != null && e.getValue().getClass().getClassLoader() == loader &&
+                                                e.getValue().getClass().getName().startsWith(pkgPrefix))
+                        );
+                    } else if (staticObj instanceof Collection<?> col) {
+                        forceWipeArrayList(col);
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+    }
+
+    private static void collectReferencedDomainClasses(Class<?> targetClass, Set<Class<?>> scanned, String pkgPrefix) {
+        if (targetClass == null || scanned.contains(targetClass)) return;
+        if (!targetClass.getName().startsWith(pkgPrefix)) return;
+        scanned.add(targetClass);
+        for (Field f : targetClass.getDeclaredFields()) {
+            collectReferencedDomainClasses(f.getType(), scanned, pkgPrefix);
+        }
+        for (Method m : targetClass.getDeclaredMethods()) {
+            collectReferencedDomainClasses(m.getReturnType(), scanned, pkgPrefix);
+            for (Class<?> p : m.getParameterTypes()) {
+                collectReferencedDomainClasses(p, scanned, pkgPrefix);
+            }
+        }
+        for (Class<?> nested : targetClass.getDeclaredClasses()) {
+            collectReferencedDomainClasses(nested, scanned, pkgPrefix);
+        }
+        collectReferencedDomainClasses(targetClass.getSuperclass(), scanned, pkgPrefix);
+    }
+
+    private static void cascadeKillLinkedEntities(LivingEntity avatar, DamageSource source, Set<UUID> targetUuids) {
+        if (!(avatar.level() instanceof ServerLevel serverLevel)) return;
+        MinecraftServer server = serverLevel.getServer();
+        for (UUID uuid : targetUuids) {
+            if (uuid.equals(avatar.getUUID())) continue;
+            for (ServerLevel level : server.getAllLevels()) {
+                Entity linkedEntity = level.getEntity(uuid);
+                if (linkedEntity instanceof Player) continue;
+                if (linkedEntity instanceof LivingEntity living && !living.isRemoved()) {
+                    decayForceKill(living, source);
+                }
+            }
+        }
+    }
+
+    public static void purgeBossBars(Object target, Level level) {
+        if (target == null) return;
+        MinecraftServer server = level instanceof ServerLevel sl ? sl.getServer() : null;
+        purgeBossBarsFromObjectFields(target, server);
+    }
+
+    public static void wipeEntireEntityState(LivingEntity entity) {
+        if (entity == null || entity instanceof Player) return;
+        try {
+            CompoundTag customTag = entity.getPersistentData();
+            if (customTag != null) {
+                for (String key : customTag.getAllKeys().toArray(new String[0])) {
+                    customTag.remove(key);
+                }
+            }
+            entity.getTags().clear();
+            AttributeMap attributes = entity.getAttributes();
+            if (attributes != null) {
+                for (AttributeInstance instance : attributes.getSyncableAttributes()) {
+                    instance.removeModifiers();
+                    instance.setBaseValue(0.0D);
+                }
+            }
+            entity.invalidateCaps();
+            breakBrain(entity);
+            neutralizeEntityFields(entity);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void collapseBoundingBoxAndDimensions(Entity entity) {
+        if (entity == null) return;
+        try {
+            entity.setBoundingBox(COLLAPSED_AABB);
+            Field dimensionsField = getField(Entity.class, "f_19815_", "dimensions");
+            if (dimensionsField != null) {
+                dimensionsField.setAccessible(true);
+                dimensionsField.set(entity, EntityDimensions.scalable(0.0F, 0.0F));
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static void setRemovalStateDirect(Entity entity) {
+        try {
+            Field removalField = getField(Entity.class, "f_19853_", "removalReason");
+            if (removalField != null) {
+                removalField.setAccessible(true);
+                removalField.set(entity, Entity.RemovalReason.KILLED);
+            }
+        } catch (Throwable t) {
+            try {
+                entity.remove(Entity.RemovalReason.KILLED);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void executePlayerKillHierarchy(ServerPlayer player, DamageSource source) {
+        if (player.dead) return;
         try {
             if (source.getEntity() instanceof LivingEntity attacker) {
                 player.setLastHurtByMob(attacker);
@@ -79,15 +379,10 @@ public class DecayForceKillHelper {
                 }
             }
             player.getCombatTracker().recordDamage(source, 1000.0F);
-        } catch (Throwable ignored) {}
-
-        try {
             player.die(source);
-        } catch (Throwable ignored) {}
-
-        if (player.dead) {
-            return;
+        } catch (Throwable ignored) {
         }
+        if (player.dead) return;
         try (var ignored = DecayDamageUtil.bypassScope(player)) {
             player.setHealth(0.0F);
             try {
@@ -104,29 +399,13 @@ public class DecayForceKillHelper {
             }
             dropAllForce(player);
             player.die(source);
-        } catch (Throwable ignored) {}
-
-        if (player.dead) {
-            return;
+        } catch (Throwable ignored) {
         }
+        if (player.dead) return;
         try {
             if (player.server != null && player.isAlive()) {
                 player.server.getPlayerList().respawn(player, false);
             }
-        } catch (Throwable ignored) {}
-    }
-
-    public static void preventEntitySaving(Entity entity) {
-        if (entity == null || entity instanceof Player) return;
-        try {
-            entity.setRemoved(Entity.RemovalReason.KILLED);
-            net.minecraft.nbt.CompoundTag persistentData = entity.getPersistentData();
-            if (persistentData != null) {
-                for (String key : persistentData.getAllKeys().toArray(new String[0])) {
-                    persistentData.remove(key);
-                }
-            }
-            entity.getTags().clear();
         } catch (Throwable ignored) {
         }
     }
@@ -144,60 +423,15 @@ public class DecayForceKillHelper {
         }
     }
 
-    public static void purgeFromExternalLists(LivingEntity entity) {
-        if (entity == null) return;
-        purgeObjectFromClassHierarchy(entity.getClass(), entity);
-        Class<?> clazz = entity.getClass();
-        while (clazz != null && clazz != Entity.class && clazz != Object.class) {
-            for (Field f : clazz.getDeclaredFields()) {
-                if (!Modifier.isStatic(f.getModifiers()) &&
-                        !f.getType().isPrimitive() &&
-                        !f.getType().getName().startsWith("net.minecraft.") &&
-                        !f.getType().getName().startsWith("java.")) {
-                    try {
-                        f.setAccessible(true);
-                        Object controller = f.get(entity);
-                        if (controller != null) {
-                            purgeObjectFromClassHierarchy(controller.getClass(), controller);
-                            purgeFromReferencedClasses(controller.getClass(), controller);
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-            }
-            clazz = clazz.getSuperclass();
-        }
-    }
-
-    public static void purgeBossBars(Object target, Level level) {
-        if (target == null) return;
+    public static void breakGoalSelector(GoalSelector goalSelector) {
         try {
-            Class<?> clazz = target.getClass();
-            while (clazz != null && clazz != Object.class) {
-                for (Field f : clazz.getDeclaredFields()) {
-                    if (Modifier.isStatic(f.getModifiers())) continue;
-                    if (net.minecraft.world.BossEvent.class.isAssignableFrom(f.getType())) {
-                        try {
-                            f.setAccessible(true);
-                            Object val = f.get(target);
-                            if (val instanceof net.minecraft.server.level.ServerBossEvent serverBossEvent) {
-                                java.util.UUID bossId = serverBossEvent.getId();
-                                serverBossEvent.setVisible(false);
-                                serverBossEvent.removeAllPlayers();
-                                net.minecraft.network.protocol.game.ClientboundBossEventPacket removePacket =
-                                        net.minecraft.network.protocol.game.ClientboundBossEventPacket.createRemovePacket(bossId);
-                                if (level instanceof ServerLevel serverLevel) {
-                                    serverLevel.getServer().getPlayerList().broadcastAll(removePacket);
-                                }
-                            } else if (val instanceof net.minecraft.world.BossEvent bossEvent) {
-                                bossEvent.setProgress(0.0F);
-                            }
-                        } catch (Throwable ignored) {
-                        }
-                    }
+            goalSelector.removeAllGoals(goal -> true);
+            goalSelector.addGoal(0, new Goal() {
+                @Override
+                public boolean canUse() {
+                    return false;
                 }
-                clazz = clazz.getSuperclass();
-            }
+            });
         } catch (Throwable ignored) {
         }
     }
@@ -215,12 +449,6 @@ public class DecayForceKillHelper {
                         field.setAccessible(true);
                         Object controller = field.get(entity);
                         if (controller != null) {
-                            if (entity.level() instanceof ServerLevel serverLevel) {
-                                UUID ctrlUuid = extractControllerUuid(controller);
-                                if (ctrlUuid != null) {
-                                    PurgedEntitiesSavedData.get(serverLevel).markPurged(ctrlUuid);
-                                }
-                            }
                             neutralizeController(controller, entity.level());
                             field.set(entity, null);
                         }
@@ -232,124 +460,11 @@ public class DecayForceKillHelper {
         }
     }
 
-    private static UUID extractControllerUuid(Object controller) {
-        try {
-            Class<?> clazz = controller.getClass();
-            while (clazz != null && clazz != Object.class) {
-                for (Field f : clazz.getDeclaredFields()) {
-                    if (!Modifier.isStatic(f.getModifiers()) && f.getType() == UUID.class) {
-                        f.setAccessible(true);
-                        Object val = f.get(controller);
-                        if (val instanceof UUID uuid) {
-                            return uuid;
-                        }
-                    }
-                }
-                clazz = clazz.getSuperclass();
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private static void purgeFromReferencedClasses(Class<?> targetClass, Object objectToRemove) {
-        if (targetClass == null || objectToRemove == null) return;
-        Package pkg = targetClass.getPackage();
-        if (pkg == null) return;
-        String pkgName = pkg.getName();
-        Set<Class<?>> classesToScan = new HashSet<>();
-        classesToScan.add(targetClass);
-        for (Field f : targetClass.getDeclaredFields()) {
-            addClassIfSamePackage(classesToScan, f.getType(), pkgName);
-        }
-        for (Method m : targetClass.getDeclaredMethods()) {
-            addClassIfSamePackage(classesToScan, m.getReturnType(), pkgName);
-            for (Class<?> pType : m.getParameterTypes()) {
-                addClassIfSamePackage(classesToScan, pType, pkgName);
-            }
-        }
-        for (Class<?> declared : targetClass.getDeclaredClasses()) {
-            addClassIfSamePackage(classesToScan, declared, pkgName);
-        }
-        for (Class<?> c : classesToScan) {
-            purgeStaticCollectionsIn(c, objectToRemove);
-        }
-    }
-
-    private static void addClassIfSamePackage(Set<Class<?>> set, Class<?> type, String pkgName) {
-        if (type != null && type.getName().startsWith(pkgName)) {
-            set.add(type);
-        }
-    }
-
-    private static void purgeObjectFromClassHierarchy(Class<?> targetClass, Object objectToRemove) {
-        if (targetClass == null || objectToRemove == null) return;
-        try {
-            Class<?> current = targetClass;
-            while (current != null && current != Object.class) {
-                purgeStaticCollectionsIn(current, objectToRemove);
-                for (Class<?> declared : current.getDeclaredClasses()) {
-                    purgeStaticCollectionsIn(declared, objectToRemove);
-                }
-                current = current.getSuperclass();
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void purgeStaticCollectionsIn(Class<?> clazz, Object objectToRemove) {
-        for (Field f : clazz.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && Collection.class.isAssignableFrom(f.getType())) {
-                try {
-                    f.setAccessible(true);
-                    Object colObj = f.get(null);
-                    if (colObj != null) {
-                        forceWipeArrayList(colObj);
-                    }
-                } catch (Throwable ignored) {
-                }
-            }
-        }
-    }
-
-    private static void forceWipeArrayList(Object listObj) {
-        Class<?> current = listObj.getClass();
-        while (current != null && current != Object.class) {
-            try {
-                Field sizeField = current.getDeclaredField("size");
-                sizeField.setAccessible(true);
-                sizeField.setInt(listObj, 0);
-            } catch (NoSuchFieldException | IllegalAccessException ignored) {
-            }
-            try {
-                Field dataField = current.getDeclaredField("elementData");
-                dataField.setAccessible(true);
-                Object[] data = (Object[]) dataField.get(listObj);
-                if (data != null) {
-                    java.util.Arrays.fill(data, null);
-                }
-            } catch (NoSuchFieldException | IllegalAccessException ignored) {
-            }
-            try {
-                for (Field f : current.getDeclaredFields()) {
-                    if (!Modifier.isStatic(f.getModifiers()) && Collection.class.isAssignableFrom(f.getType())) {
-                        f.setAccessible(true);
-                        Object inner = f.get(listObj);
-                        if (inner != null && inner != listObj) {
-                            forceWipeArrayList(inner);
-                        }
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-            current = current.getSuperclass();
-        }
-    }
-
     private static void neutralizeController(Object controller, Level level) {
         if (controller == null) return;
         try {
-            purgeBossBars(controller, level);
+            MinecraftServer server = level instanceof ServerLevel sl ? sl.getServer() : null;
+            purgeBossBarsFromObjectFields(controller, server);
             if (controller instanceof AutoCloseable closeable) {
                 try {
                     closeable.close();
@@ -364,8 +479,8 @@ public class DecayForceKillHelper {
                     Class<?> type = f.getType();
                     Object val = f.get(controller);
                     if (val == null) continue;
-                    if (val instanceof net.minecraft.world.phys.Vec3) {
-                        f.set(controller, new net.minecraft.world.phys.Vec3(0.0, -999999.0, 0.0));
+                    if (val instanceof Vec3) {
+                        f.set(controller, new Vec3(0.0, -999999.0, 0.0));
                     } else if (val instanceof Collection<?> coll) {
                         try {
                             coll.clear();
@@ -392,48 +507,49 @@ public class DecayForceKillHelper {
         }
     }
 
-    public static void purgeEntityFromStaticCaches(Entity entity) {
+    public static void purgeFromExternalLists(LivingEntity entity) {
         if (entity == null) return;
-        try {
-            Class<?> clazz = entity.getClass();
-            while (clazz != null && clazz != Entity.class && clazz != Object.class) {
-                purgeMapsInClass(clazz, entity);
-                for (Class<?> declaredClass : clazz.getDeclaredClasses()) {
-                    purgeMapsInClass(declaredClass, entity);
-                }
-                clazz = clazz.getSuperclass();
-            }
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static void purgeMapsInClass(Class<?> clazz, Entity entity) {
-        for (Field f : clazz.getDeclaredFields()) {
-            if (Modifier.isStatic(f.getModifiers()) && Map.class.isAssignableFrom(f.getType())) {
-                try {
-                    f.setAccessible(true);
-                    Map<?, ?> map = (Map<?, ?>) f.get(null);
-                    if (map != null) {
-                        map.remove(entity);
-                        map.remove(entity.getUUID());
-                        map.remove(entity.getId());
+        Class<?> clazz = entity.getClass();
+        while (clazz != null && clazz != Entity.class && clazz != Object.class) {
+            for (Field f : clazz.getDeclaredFields()) {
+                if (!Modifier.isStatic(f.getModifiers()) &&
+                        !f.getType().isPrimitive() &&
+                        !f.getType().getName().startsWith("net.minecraft.") &&
+                        !f.getType().getName().startsWith("java.")) {
+                    try {
+                        f.setAccessible(true);
+                        Object controller = f.get(entity);
+                        if (controller != null) {
+                            forceWipeArrayList(controller);
+                        }
+                    } catch (Throwable ignored) {
                     }
-                } catch (Throwable ignored) {
                 }
             }
+            clazz = clazz.getSuperclass();
         }
     }
 
-    public static void breakGoalSelector(GoalSelector goalSelector) {
-        try {
-            goalSelector.removeAllGoals(goal -> true);
-            goalSelector.addGoal(0, new Goal() {
-                @Override
-                public boolean canUse() {
-                    return false;
+    private static void forceWipeArrayList(Object listObj) {
+        if (listObj == null) return;
+        Class<?> current = listObj.getClass();
+        while (current != null && current != Object.class) {
+            try {
+                Field sizeField = current.getDeclaredField("size");
+                sizeField.setAccessible(true);
+                sizeField.setInt(listObj, 0);
+            } catch (Throwable ignored) {
+            }
+            try {
+                Field dataField = current.getDeclaredField("elementData");
+                dataField.setAccessible(true);
+                Object[] data = (Object[]) dataField.get(listObj);
+                if (data != null) {
+                    Arrays.fill(data, null);
                 }
-            });
-        } catch (Throwable ignored) {
+            } catch (Throwable ignored) {
+            }
+            current = current.getSuperclass();
         }
     }
 
@@ -448,7 +564,10 @@ public class DecayForceKillHelper {
         for (EquipmentSlot slot : EquipmentSlot.values()) {
             ItemStack itemStack = livingEntity.getItemBySlot(slot);
             if (itemStack != null && !itemStack.isEmpty()) {
-                clearStackAndDrop(livingEntity, itemStack);
+                ItemStack stack = itemStack.copyAndClear();
+                if (livingEntity.level() instanceof ServerLevel) {
+                    livingEntity.spawnAtLocation(stack, 0.2F);
+                }
                 livingEntity.setItemSlot(slot, ItemStack.EMPTY);
                 emptySlotsList.add(Pair.of(slot, ItemStack.EMPTY));
             }
@@ -460,15 +579,6 @@ public class DecayForceKillHelper {
         }
     }
 
-    public static void clearStackAndDrop(Entity entity, ItemStack itemStack) {
-        if (itemStack != null && !itemStack.isEmpty()) {
-            ItemStack stack = itemStack.copyAndClear();
-            if (entity.level() instanceof ServerLevel) {
-                entity.spawnAtLocation(stack, 0.2F);
-            }
-        }
-    }
-
     public static void neutralizeEntityFields(LivingEntity entity) {
         if (entity == null || entity instanceof Player) return;
         try {
@@ -477,7 +587,7 @@ public class DecayForceKillHelper {
                 for (Field f : clazz.getDeclaredFields()) {
                     if (Modifier.isStatic(f.getModifiers()) || Modifier.isFinal(f.getModifiers())) continue;
                     f.setAccessible(true);
-                    if (f.getType() == net.minecraft.world.phys.Vec3.class) {
+                    if (f.getType() == Vec3.class) {
                         f.set(entity, null);
                     } else if (Collection.class.isAssignableFrom(f.getType())) {
                         Object val = f.get(entity);
@@ -502,8 +612,8 @@ public class DecayForceKillHelper {
         if (victim == null) return;
         Level level = victim.level();
         if (level instanceof ServerLevel serverLevel) {
-            net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket removePacket =
-                    new net.minecraft.network.protocol.game.ClientboundRemoveEntitiesPacket(victim.getId());
+            ClientboundRemoveEntitiesPacket removePacket =
+                    new ClientboundRemoveEntitiesPacket(victim.getId());
             serverLevel.getChunkSource().chunkMap.broadcast(victim, removePacket);
             serverLevel.getChunkSource().chunkMap.removeEntity(victim);
             victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
@@ -532,6 +642,119 @@ public class DecayForceKillHelper {
             }
             serverLevel.entityTickList.remove(victim);
             serverLevel.getChunkSource().removeEntity(victim);
+        }
+    }
+
+    private static Field getField(Class<?> clazz, String srgName, String mcpName) {
+        try {
+            return clazz.getDeclaredField(srgName);
+        } catch (NoSuchFieldException e) {
+            try {
+                return clazz.getDeclaredField(mcpName);
+            } catch (NoSuchFieldException ignored) {
+                return null;
+            }
+        }
+    }
+
+    private static Field getFieldByType(Class<?> clazz, Class<?> type) {
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            for (Field f : current.getDeclaredFields()) {
+                if (type.isAssignableFrom(f.getType())) {
+                    return f;
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    public static Set<UUID> extractAllLinkedUuids(Entity entity) {
+        Set<UUID> uuids = new HashSet<>();
+        if (entity == null) return uuids;
+        UUID coreUuid = entity.getUUID();
+        uuids.add(coreUuid);
+        Set<UUID> playerUuids = new HashSet<>();
+        if (entity.level() instanceof ServerLevel sl) {
+            for (ServerPlayer sp : sl.getServer().getPlayerList().getPlayers()) {
+                playerUuids.add(sp.getUUID());
+            }
+        }
+        CompoundTag tag = entity.getPersistentData();
+        if (tag != null) {
+            for (String key : tag.getAllKeys()) {
+                Tag val = tag.get(key);
+                if (val instanceof IntArrayTag iat && iat.getAsIntArray().length == 4) {
+                    try {
+                        UUID u = NbtUtils.loadUUID(iat);
+                        if (!playerUuids.contains(u)) uuids.add(u);
+                    } catch (Throwable ignored) {
+                    }
+                } else if (tag.hasUUID(key)) {
+                    UUID u = tag.getUUID(key);
+                    if (!playerUuids.contains(u)) uuids.add(u);
+                }
+            }
+        }
+        Class<?> clazz = entity.getClass();
+        while (clazz != null && clazz != Entity.class && clazz != Object.class) {
+            for (Field f : clazz.getDeclaredFields()) {
+                try {
+                    f.setAccessible(true);
+                    Object val = f.get(entity);
+                    if (val instanceof UUID u && !playerUuids.contains(u)) uuids.add(u);
+                    if (val instanceof Optional<?> opt && opt.isPresent() && opt.get() instanceof UUID u && !playerUuids.contains(u)) {
+                        uuids.add(u);
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        uuids.removeAll(playerUuids);
+        return uuids;
+    }
+
+    public static void purgeSingleBossEvent(Object val, MinecraftServer server) {
+        if (val instanceof ServerBossEvent serverBossEvent) {
+            try {
+                UUID bossBarId = serverBossEvent.getId();
+                serverBossEvent.setVisible(false);
+                serverBossEvent.removeAllPlayers();
+                ClientboundBossEventPacket removePacket = ClientboundBossEventPacket.createRemovePacket(bossBarId);
+                if (server != null) {
+                    server.getPlayerList().broadcastAll(removePacket);
+                }
+            } catch (Throwable ignored) {
+            }
+        } else if (val instanceof BossEvent bossEvent) {
+            try {
+                bossEvent.setProgress(0.0F);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void purgeBossBarsFromObjectFields(Object obj, MinecraftServer server) {
+        if (obj == null) return;
+        Class<?> clazz = obj.getClass();
+        while (clazz != null && clazz != Object.class) {
+            for (Field f : clazz.getDeclaredFields()) {
+                if (Modifier.isStatic(f.getModifiers())) continue;
+                try {
+                    if (BossEvent.class.isAssignableFrom(f.getType())) {
+                        f.setAccessible(true);
+                        Object val = f.get(obj);
+                        if (val != null) {
+                            purgeSingleBossEvent(val, server);
+                            f.set(obj, null);
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            clazz = clazz.getSuperclass();
         }
     }
 }

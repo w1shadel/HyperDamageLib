@@ -16,7 +16,6 @@ import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -31,7 +30,7 @@ public class PenetrateSwordItem extends SwordItem {
             DamageSource source = DecayDamageUtil.getPenetrateSource(player.level(), player);
             DecayDamageUtil.applyCustomDamage(livingTarget, source, 18.0F);
         }
-        return true; 
+        return true;
     }
 
     @Override
@@ -40,7 +39,6 @@ public class PenetrateSwordItem extends SwordItem {
             AABB aoe = player.getBoundingBox().inflate(5.0D);
             List<LivingEntity> targets = level.getEntitiesOfClass(LivingEntity.class, aoe,
                     e -> e != player && e.isAlive() && !e.isDeadOrDying());
-
             DamageSource source = DecayDamageUtil.getPenetrateSource(level, player);
             for (LivingEntity target : targets) {
                 if (target.isDeadOrDying() || target.dead || target.getHealth() <= 0.0F) {

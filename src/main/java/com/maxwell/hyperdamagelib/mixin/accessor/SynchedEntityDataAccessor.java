@@ -10,7 +10,6 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(SynchedEntityData.class)
 public interface SynchedEntityDataAccessor {
-
     @Accessor("itemsById")
     Int2ObjectMap<SynchedEntityData.DataItem<?>> getItemsById();
 

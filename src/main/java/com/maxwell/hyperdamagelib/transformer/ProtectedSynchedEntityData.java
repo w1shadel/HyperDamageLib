@@ -19,23 +19,38 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
         super(entity);
         this.original = original;
         this.ownerEntity = entity;
-
         try {
             SynchedEntityDataAccessor myAcc = (SynchedEntityDataAccessor) this;
             SynchedEntityDataAccessor origAcc = (SynchedEntityDataAccessor) original;
             Int2ObjectMap<DataItem<?>> origMap = origAcc.getItemsById();
-
             for (Int2ObjectMap.Entry<DataItem<?>> entry : origMap.int2ObjectEntrySet()) {
                 DataItem<?> origItem = entry.getValue();
                 myAcc.getItemsById().put(entry.getIntKey(), new ProtectedDataItem<>(origItem, entity));
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+        }
     }
+
+    public static boolean isOwnerInvincible(Entity entity) {
+        return entity instanceof LivingEntity living && DecayEntityMethods.isP(living);
+    }
+
+    public static boolean isHealthKey(EntityDataAccessor<?> key) {
+        try {
+            return key.equals(LivingEntityAccessor.getDataHealthId());
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isHealthDrop(EntityDataAccessor<?> key, Object value) {
+        return false;
+    }
+
     public void hdl$forceSetHealth(float health) {
         try {
             EntityDataAccessor<Float> healthId = LivingEntityAccessor.getDataHealthId();
             SynchedEntityDataAccessor acc = (SynchedEntityDataAccessor) this;
-
             DataItem<Float> item = acc.invokeGetItem(healthId);
             if (item != null) {
                 item.setValue(health);
@@ -48,16 +63,17 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
         } catch (Throwable t) {
             try {
                 super.set(LivingEntityAccessor.getDataHealthId(), health, true);
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
     }
+
     public SynchedEntityData getOriginal() {
         return this.original;
     }
 
     @Override
     public <T> void set(EntityDataAccessor<T> key, T value, boolean force) {
-
         if (isOwnerInvincible() && isHealthDrop(key, value)) {
             return;
         }
@@ -72,7 +88,6 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
     @Override
     @SuppressWarnings("unchecked")
     public <T> T get(EntityDataAccessor<T> key) {
-
         if (isHealthKey(key) && isOwnerInvincible()) {
             LivingEntity living = (LivingEntity) this.ownerEntity;
             return (T) Float.valueOf(DecayEntityMethods.hdl$getImmortalHealth(living));
@@ -113,7 +128,8 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
                 entries = entries.stream()
                         .filter(entry -> entry.id() != healthId)
                         .collect(Collectors.toList());
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+            }
         }
         this.original.assignValues(entries);
     }
@@ -123,24 +139,8 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
         return this.original.isEmpty();
     }
 
-    public static boolean isOwnerInvincible(Entity entity) {
-        return entity instanceof LivingEntity living && DecayEntityMethods.isP(living);
-    }
-
     private boolean isOwnerInvincible() {
         return isOwnerInvincible(this.ownerEntity);
-    }
-
-    public static boolean isHealthKey(EntityDataAccessor<?> key) {
-        try {
-            return key.equals(LivingEntityAccessor.getDataHealthId());
-        } catch (Throwable ignored) {
-            return false;
-        }
-    }
-
-    private static boolean isHealthDrop(EntityDataAccessor<?> key, Object value) {
-        return false; 
     }
 
     public static class ProtectedDataItem<T> extends DataItem<T> {
@@ -155,22 +155,6 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
         }
 
         @Override
-        public void setValue(T pValue) {
-            if (ProtectedSynchedEntityData.isHealthKey(this.getAccessor()) &&
-                    ProtectedSynchedEntityData.isOwnerInvincible(this.ownerEntity)) {
-                if (pValue instanceof Float newHealth) {
-                    LivingEntity living = (LivingEntity) this.ownerEntity;
-                    float currentHealth = living.getHealth();
-                    if (newHealth < currentHealth) {
-                        return; 
-                    }
-                }
-            }
-            this.delegate.setValue(pValue);
-            super.setValue(pValue);
-        }
-
-        @Override
         public T getValue() {
             if (ProtectedSynchedEntityData.isHealthKey(this.getAccessor()) &&
                     ProtectedSynchedEntityData.isOwnerInvincible(this.ownerEntity)) {
@@ -179,6 +163,22 @@ public class ProtectedSynchedEntityData extends SynchedEntityData {
                 }
             }
             return this.delegate.getValue();
+        }
+
+        @Override
+        public void setValue(T pValue) {
+            if (ProtectedSynchedEntityData.isHealthKey(this.getAccessor()) &&
+                    ProtectedSynchedEntityData.isOwnerInvincible(this.ownerEntity)) {
+                if (pValue instanceof Float newHealth) {
+                    LivingEntity living = (LivingEntity) this.ownerEntity;
+                    float currentHealth = living.getHealth();
+                    if (newHealth < currentHealth) {
+                        return;
+                    }
+                }
+            }
+            this.delegate.setValue(pValue);
+            super.setValue(pValue);
         }
     }
 

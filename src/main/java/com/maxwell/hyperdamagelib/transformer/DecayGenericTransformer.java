@@ -1,7 +1,6 @@
 package com.maxwell.hyperdamagelib.transformer;
 
 import cpw.mods.modlauncher.serviceapi.ILaunchPluginService;
-import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -53,14 +52,122 @@ public final class DecayGenericTransformer implements Opcodes {
                 }
             }
         }
+        if (classNode.name.equals("net/minecraft/world/level/chunk/storage/EntityStorage")) {
+            for (MethodNode method : classNode.methods) {
+                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
+                for (AbstractInsnNode insn : method.instructions.toArray()) {
+                    if (insn instanceof MethodInsnNode mi && mi.name.equals("save") && mi.owner.equals("net/minecraft/world/entity/Entity")) {
+                        InsnList list = new InsnList();
+                        list.add(new VarInsnNode(ALOAD, 0));
+                        list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldPreventDiskSave", "(Ljava/lang/Object;)Z", false));
+                        LabelNode proceed = new LabelNode();
+                        list.add(new JumpInsnNode(IFEQ, proceed));
+                        list.add(new InsnNode(ACONST_NULL));
+                        list.add(proceed);
+                        method.instructions.insertBefore(mi, list);
+                        modified = true;
+                    }
+                }
+            }
+        }
         if (classNode.name.equals("net/minecraft/world/entity/Entity")) {
             for (MethodNode method : classNode.methods) {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
-                if ((method.name.equals("isPickable") || method.name.equals("m_6087_")) && method.desc.equals("()Z")) {
-                    injectForceTrue(method);
+                if ((method.name.equals("isPickable") || method.name.equals("m_6087_") ||
+                        method.name.equals("isAttackable") || method.name.equals("m_6097_")) && method.desc.equals("()Z")) {
+                    injectPickableControl(method);
                     modified = true;
-                } else if ((method.name.equals("isAttackable") || method.name.equals("m_6097_")) && method.desc.equals("()Z")) {
-                    injectForceTrue(method);
+                }
+                if ((method.name.equals("refreshDimensions") || method.name.equals("m_6210_")) && method.desc.equals("()V")) {
+                    LabelNode normal = new LabelNode();
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldCancelRefreshDimensions", "(Ljava/lang/Object;)Z", false));
+                    list.add(new JumpInsnNode(IFEQ, normal));
+                    list.add(new InsnNode(RETURN));
+                    list.add(normal);
+                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
+                if ((method.name.equals("isPushable") || method.name.equals("m_6094_") ||
+                        method.name.equals("canBeCollidedWith") || method.name.equals("m_5829_") ||
+                        method.name.equals("isCollidable") || method.name.equals("m_5830_")) && method.desc.equals("()Z")) {
+                    LabelNode normal = new LabelNode();
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldCancelCollision", "(Ljava/lang/Object;)Z", false));
+                    list.add(new JumpInsnNode(IFEQ, normal));
+                    list.add(new InsnNode(ICONST_0));
+                    list.add(new InsnNode(IRETURN));
+                    list.add(normal);
+                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
+                if ((method.name.equals("setBoundingBox") || method.name.equals("m_20011_")) &&
+                        method.desc.equals("(Lnet/minecraft/world/phys/AABB;)V")) {
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new VarInsnNode(ALOAD, 1));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$sanitizeBoundingBox",
+                            "(Ljava/lang/Object;Lnet/minecraft/world/phys/AABB;)Lnet/minecraft/world/phys/AABB;", false));
+                    list.add(new VarInsnNode(ASTORE, 1));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
+                if ((method.name.equals("remove") || method.name.equals("m_142687_") ||
+                        method.name.equals("discard") || method.name.equals("m_146870_"))) {
+                    injectForceRemovalBypass(method);
+                    modified = true;
+                }
+            }
+        }
+        if (classNode.name.equals("net/minecraft/server/level/ServerLevel") ||
+                classNode.name.equals("net/minecraft/client/multiplayer/ClientLevel")) {
+            for (MethodNode method : classNode.methods) {
+                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
+                if ((method.name.startsWith("addEntity") || method.name.equals("addFreshEntity") ||
+                        method.name.equals("m_8837_") || method.name.equals("m_7967_") || method.name.equals("m_104625_"))) {
+                    LabelNode normal = new LabelNode();
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 1));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldRejectSpawn", "(Ljava/lang/Object;)Z", false));
+                    list.add(new JumpInsnNode(IFEQ, normal));
+                    if (method.desc.endsWith("Z")) {
+                        list.add(new InsnNode(ICONST_0));
+                        list.add(new InsnNode(IRETURN));
+                    } else {
+                        list.add(new InsnNode(RETURN));
+                    }
+                    list.add(normal);
+                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
+                    modified = true;
+                }
+            }
+        }
+        if (classNode.name.equals("net/minecraft/client/renderer/entity/EntityRenderDispatcher")) {
+            for (MethodNode method : classNode.methods) {
+                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
+                if ((method.name.equals("render") || method.name.equals("m_114384_")) &&
+                        method.desc.startsWith("(Lnet/minecraft/world/entity/Entity;") &&
+                        method.desc.endsWith(")V")) {
+                    LabelNode normal = new LabelNode();
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 1));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldCancelRender",
+                            "(Ljava/lang/Object;)Z", false));
+                    list.add(new JumpInsnNode(IFEQ, normal));
+                    list.add(new InsnNode(RETURN));
+                    list.add(normal);
+                    list.add(new FrameNode(F_SAME, 0, null, 0, null));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
             }
@@ -75,6 +182,17 @@ public final class DecayGenericTransformer implements Opcodes {
                     list.add(new VarInsnNode(ALOAD, 0));
                     list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$forceTickInvulnerable", "(Lnet/minecraft/world/entity/LivingEntity;)V", false));
                     method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    modified = true;
+                }
+                if ((method.name.equals("setHealth") || method.name.equals("m_21153_")) && method.desc.equals("(F)V")) {
+                    InsnList list = new InsnList();
+                    list.add(new VarInsnNode(ALOAD, 0));
+                    list.add(new VarInsnNode(FLOAD, 1));
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$sanitizeHealthWrite",
+                            "(Ljava/lang/Object;F)F", false));
+                    list.add(new VarInsnNode(FSTORE, 1));
+                    method.instructions.insertBefore(method.instructions.getFirst(), list);
+                    method.maxStack = Math.max(method.maxStack, 2);
                     modified = true;
                 }
             }
@@ -102,14 +220,31 @@ public final class DecayGenericTransformer implements Opcodes {
         }
         if (!isSys(classNode.name) && !isExcludedOwner(classNode.name)) {
             for (MethodNode method : classNode.methods) {
-                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE | ACC_STATIC)) != 0) continue;
+                if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
                 if (method.instructions == null || method.instructions.getFirst() == null) continue;
+                if ((method.access & ACC_STATIC) != 0 && method.desc.equals("()Ljava/util/List;")) {
+                    for (AbstractInsnNode insn : method.instructions.toArray()) {
+                        if (insn.getOpcode() == ARETURN) {
+                            method.instructions.insertBefore(insn, new MethodInsnNode(
+                                    INVOKESTATIC, METHODS, "hdl$filterPurgedList",
+                                    "(Ljava/util/List;)Ljava/util/List;", false
+                            ));
+                            method.maxStack = Math.max(method.maxStack, method.maxStack + 1);
+                            modified = true;
+                        }
+                    }
+                }
                 if ((method.name.equals("tick") || method.name.equals("baseTick") ||
                         method.name.equals("m_8119_") || method.name.equals("m_6075_")) &&
                         method.desc.equals("()V")) {
+                    boolean isStatic = (method.access & ACC_STATIC) != 0;
                     LabelNode skip = new LabelNode();
                     InsnList list = new InsnList();
-                    list.add(new VarInsnNode(ALOAD, 0));
+                    if (isStatic) {
+                        list.add(new InsnNode(ACONST_NULL));
+                    } else {
+                        list.add(new VarInsnNode(ALOAD, 0));
+                    }
                     list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldCancelTick", "(Ljava/lang/Object;)Z", false));
                     list.add(new JumpInsnNode(IFEQ, skip));
                     list.add(new InsnNode(RETURN));
@@ -304,18 +439,31 @@ public final class DecayGenericTransformer implements Opcodes {
         return modified ? ILaunchPluginService.ComputeFlags.SIMPLE_REWRITE : 0;
     }
 
-    private static void injectForceTrue(MethodNode method) {
-        LabelNode skip = new LabelNode(new Label());
+    private static void injectPickableControl(MethodNode method) {
+        LabelNode normal = new LabelNode();
         InsnList list = new InsnList();
         list.add(new VarInsnNode(ALOAD, 0));
-        list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "shouldForceAttackable", "(Ljava/lang/Object;)Z", false));
-        list.add(new JumpInsnNode(IFEQ, skip));
-        list.add(new InsnNode(ICONST_1));
+        list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$getPickableOverride", "(Ljava/lang/Object;)I", false));
+        list.add(new InsnNode(DUP));
+        list.add(new JumpInsnNode(IFLT, normal));
         list.add(new InsnNode(IRETURN));
-        list.add(skip);
+        list.add(normal);
+        list.add(new InsnNode(POP));
         list.add(new FrameNode(F_SAME, 0, null, 0, null));
         method.instructions.insertBefore(method.instructions.getFirst(), list);
         method.maxStack = Math.max(method.maxStack, 2);
+    }
+
+    private static void injectForceRemovalBypass(MethodNode method) {
+        for (AbstractInsnNode insn : method.instructions.toArray()) {
+            if (insn instanceof MethodInsnNode mi && mi.owner.startsWith("org/spongepowered/asm/mixin/injection/callback/CallbackInfo")) {
+                if (mi.name.equals("isCancelled")) {
+                    InsnList list = new InsnList();
+                    list.add(new MethodInsnNode(INVOKESTATIC, METHODS, "hdl$shouldBypassMixinCancel", "(Z)Z", false));
+                    method.instructions.insert(mi, list);
+                }
+            }
+        }
     }
 
     private static boolean isExcludedOwner(String owner) {

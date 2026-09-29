@@ -5,10 +5,10 @@
   "plugin": "com.maxwell.hyperdamagelib.HDLMixinPlugin",
   "refmap": "hyperdamagelib.refmap.json",
   "mixins": [
+    "ForgeHooksMixin",
     "accessor.EntityAccessor",
     "accessor.LivingEntityAccessor",
-    "accessor.SynchedEntityDataAccessor",
-    "ForgeHooksMixin"
+    "accessor.SynchedEntityDataAccessor"
   ],
   "client": [
     "client.ItemRendererMixin",

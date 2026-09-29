@@ -7,7 +7,6 @@ import com.maxwell.hyperdamagelib.mixin.accessor.LivingEntityAccessor;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundPlayerCombatKillPacket;
 import net.minecraft.network.protocol.game.ClientboundSetEntityDataPacket;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
 import net.minecraft.network.protocol.game.ClientboundUpdateMobEffectPacket;
@@ -41,8 +40,29 @@ public final class DecayDamageUtil {
     private static final Set<UUID> FORCE_KILL_TARGETS = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> BYPASS_DAMAGE_TARGETS = ConcurrentHashMap.newKeySet();
     private static final Set<UUID> BYPASS_EFFECT_TARGETS = ConcurrentHashMap.newKeySet();
+    private static final ThreadLocal<Boolean> FORCE_KILL_ACTIVE = ThreadLocal.withInitial(() -> false);
 
     private DecayDamageUtil() {
+    }
+
+    public static AutoCloseable forceKillScope(@Nullable Entity entity) {
+        if (entity == null) return () -> {
+        };
+        UUID uuid = entity.getUUID();
+        if (uuid != null) {
+            FORCE_KILL_TARGETS.add(uuid);
+        }
+        FORCE_KILL_ACTIVE.set(true);
+        return () -> {
+            if (uuid != null) {
+                FORCE_KILL_TARGETS.remove(uuid);
+            }
+            FORCE_KILL_ACTIVE.set(false);
+        };
+    }
+
+    public static boolean isForceKillActive() {
+        return FORCE_KILL_ACTIVE.get();
     }
 
     public static void markPermanentlyKilled(Entity entity) {
@@ -71,16 +91,6 @@ public final class DecayDamageUtil {
         };
         BYPASS_EFFECT_TARGETS.add(uuid);
         return () -> BYPASS_EFFECT_TARGETS.remove(uuid);
-    }
-
-    public static AutoCloseable forceKillScope(@Nullable Entity entity) {
-        if (entity == null) return () -> {
-        };
-        UUID uuid = entity.getUUID();
-        if (uuid == null) return () -> {
-        };
-        FORCE_KILL_TARGETS.add(uuid);
-        return () -> FORCE_KILL_TARGETS.remove(uuid);
     }
 
     public static boolean isForceDamage(@Nullable Entity entity) {
@@ -138,8 +148,9 @@ public final class DecayDamageUtil {
     }
 
     public static void applyCustomDamage(LivingEntity target, DamageSource source, float rawAmount) {
-        applyCustomDamage(target, source, rawAmount, false); 
+        applyCustomDamage(target, source, rawAmount, false);
     }
+
     public static void applyCustomDamage(LivingEntity target, DamageSource source, float rawAmount, boolean forceKill) {
         if (target.level().isClientSide() || rawAmount <= 0.0F) return;
         if (target instanceof MeasurementDummyEntity dummy) {
@@ -147,16 +158,13 @@ public final class DecayDamageUtil {
             return;
         }
         if (InvincibleHelper.isInvincible(target)) return;
-
         LivingEntityAccessor livAcc = (LivingEntityAccessor) target;
         EntityAccessor entAcc = (EntityAccessor) target;
         float finalDamage = rawAmount;
         float targetMaxHp = (float) target.getAttributeValue(Attributes.MAX_HEALTH);
-
         if (Float.isNaN(targetMaxHp) || Float.isInfinite(targetMaxHp) || targetMaxHp <= 0.0F) {
             targetMaxHp = 20.0F;
         }
-
         if (source.is(ModDamageTypes.PENETRATE)) {
             int invTime = entAcc.getInvulnerableTime();
             float lastHurt = livAcc.getLastHurt();
@@ -179,21 +187,17 @@ public final class DecayDamageUtil {
         } else if (source.is(ModDamageTypes.EROSION)) {
             finalDamage = rawAmount;
         }
-
         if (finalDamage <= 0.0F) return;
-
         try (var ignored = bypassScope(target)) {
             Float rawDataHp = target.getEntityData().get(LivingEntityAccessor.getDataHealthId());
             float currentHealth = (rawDataHp != null && !Float.isNaN(rawDataHp) && !Float.isInfinite(rawDataHp))
                     ? rawDataHp : targetMaxHp;
-
             float nextHealth;
             if (finalDamage >= Float.MAX_VALUE / 2 || Float.isInfinite(finalDamage)) {
                 nextHealth = 0.0F;
             } else {
                 nextHealth = Math.max(0.0F, currentHealth - finalDamage);
             }
-
             target.getCombatTracker().recordDamage(source, finalDamage);
             if (target.entityData instanceof com.maxwell.hyperdamagelib.transformer.ProtectedSynchedEntityData protectedData) {
                 protectedData.hdl$forceSetHealth(nextHealth);
@@ -203,37 +207,32 @@ public final class DecayDamageUtil {
             sendDirectDataPacket(target, nextHealth);
             target.level().broadcastDamageEvent(target, source);
             target.markHurt();
-
-
-
             if (nextHealth <= 0.0F) {
                 boolean hasTotem = false;
                 try {
                     hasTotem = livAcc.invokeCheckTotemDeathProtection(source);
-                } catch (Throwable ignored2) {}
-
+                } catch (Throwable ignored2) {
+                }
                 if (!hasTotem) {
                     if (forceKill) {
-
                         DecayForceKillHelper.decayForceKill(target, source);
                     } else {
-
-
                         target.die(source);
                     }
                 }
             } else {
                 try {
                     livAcc.invokePlayHurtSound(source);
-                } catch (Throwable ignored2) {}
+                } catch (Throwable ignored2) {
+                }
             }
-
             livAcc.setLastDamageSource(source);
             livAcc.setLastDamageStamp(target.level().getGameTime());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
+
     private static void sendDirectDataPacket(LivingEntity target, float nextHealth) {
         try {
             SynchedEntityData.DataValue<Float> healthValue = SynchedEntityData.DataValue.create(

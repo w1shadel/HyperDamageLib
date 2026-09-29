@@ -1,14 +1,14 @@
 package com.maxwell.hyperdamagelib.util;
 
 import com.maxwell.hyperdamagelib.HDL;
-import com.test.nosugar.NoSugar;
-import java.util.ArrayDeque;
-import java.util.Queue;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.TickEvent.Phase;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
+
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 @EventBusSubscriber(
         modid = HDL.MODID,
@@ -24,7 +24,7 @@ public class TaskScheduler {
         } else if (delay < 0) {
             throw new IllegalArgumentException("Delay cannot be negative: " + delay);
         } else {
-            synchronized(lock) {
+            synchronized (lock) {
                 queue.add(new Task(action, delay));
             }
         }
@@ -33,7 +33,7 @@ public class TaskScheduler {
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent e) {
         if (e.phase == Phase.END) {
-            synchronized(lock) {
+            synchronized (lock) {
                 queue.removeIf((task) -> {
                     if (task == null) {
                         return true;
@@ -45,9 +45,7 @@ public class TaskScheduler {
                             try {
                                 task.action.run();
                             } catch (Exception ex) {
-                                NoSugar.LOGGER.error("[NoSugar] Task execution failed: " + ex.getMessage(), ex);
                             }
-
                             return true;
                         } else {
                             return false;

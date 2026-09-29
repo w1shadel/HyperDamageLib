@@ -31,7 +31,7 @@ public class ErosionSwordItem extends SwordItem {
     public boolean onLeftClickEntity(ItemStack stack, Player player, Entity target) {
         if (!player.level().isClientSide() && target instanceof LivingEntity livingTarget) {
             DamageSource source = DecayDamageUtil.getErosionSource(player.level(), player);
-            DecayDamageUtil.applyCustomDamage(livingTarget, source, 30.0F);
+            DecayDamageUtil.applyCustomDamage(livingTarget, source, 30.0F, true);
         }
         return true;
     }
@@ -51,7 +51,7 @@ public class ErosionSwordItem extends SwordItem {
             for (LivingEntity target : targets) {
                 Vec3 toTarget = target.getEyePosition(1.0F).subtract(eyePos);
                 if (toTarget.length() <= range && lookVec.dot(toTarget.normalize()) > 0.35D) {
-                    DecayDamageUtil.applyCustomDamage(target, source, 30.0F);
+                    DecayDamageUtil.applyCustomDamage(target, source, 30.0F, true);
                     if (level instanceof ServerLevel serverLevel) {
                         serverLevel.sendParticles(ParticleTypes.SOUL, target.getX(), target.getY() + 1.0, target.getZ(), 10, 0.2, 0.2, 0.2, 0.1);
                     }

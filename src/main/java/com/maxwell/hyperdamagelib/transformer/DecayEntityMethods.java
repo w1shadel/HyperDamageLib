@@ -10,6 +10,7 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.game.ClientboundSetHealthPacket;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.ServerLevel;
@@ -17,17 +18,21 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.AABB;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public final class DecayEntityMethods {
+    public static final Set<UUID> CLIENT_PURGED_UUIDS = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final ThreadLocal<Boolean> RECURSION_GUARD = ThreadLocal.withInitial(() -> false);
+    private static final AABB ZERO_AABB = new AABB(0.0, -9999.0, 0.0, 0.0, -9999.0, 0.0);
+
     private DecayEntityMethods() {
     }
 
@@ -111,18 +116,15 @@ public final class DecayEntityMethods {
         }
         return pHealth;
     }
-    private static final ThreadLocal<Boolean> RECURSION_GUARD = ThreadLocal.withInitial(() -> false);
+
     public static float hdl$getHealth(Object obj) {
         if (obj instanceof LivingEntity entity) {
-
             if (isP(entity)) {
                 return hdl$getImmortalHealth(entity);
             }
-
             if (DecayDamageUtil.isForceDamage(entity)) {
                 return -Float.MAX_VALUE;
             }
-
             if (RECURSION_GUARD.get()) {
                 return getRawDataHp(entity);
             }
@@ -142,8 +144,8 @@ public final class DecayEntityMethods {
             if (hp != null && !Float.isNaN(hp)) {
                 return hp;
             }
-        } catch (Throwable ignored) {}
-
+        } catch (Throwable ignored) {
+        }
         return entity.getMaxHealth();
     }
 
@@ -362,10 +364,57 @@ public final class DecayEntityMethods {
         return false;
     }
 
+    public static boolean hdl$shouldPreventDiskSave(Object obj) {
+        if (obj instanceof Entity entity) {
+            if (DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive()) {
+                return true;
+            }
+            if (entity.level() instanceof ServerLevel sl) {
+                PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(sl);
+                if (data != null && data.isPurged(entity.getUUID())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean hdl$shouldRejectSpawn(Object obj) {
+        if (obj instanceof Entity entity) {
+            if (DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive()) {
+                return true;
+            }
+            CompoundTag tag = entity.getPersistentData();
+            if (tag != null) {
+                for (String key : tag.getAllKeys()) {
+                    if (tag.hasUUID(key)) {
+                        UUID id = tag.getUUID(key);
+                        if (entity.level() instanceof ServerLevel sl) {
+                            PurgedEntitiesSavedData data = PurgedEntitiesSavedData.get(sl);
+                            if (data != null && data.isPurged(id)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    public static boolean hdl$shouldCancelRefreshDimensions(Object obj) {
+        if (obj instanceof Entity entity) {
+            return DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive();
+        }
+        return false;
+    }
+
     public static <T> Predicate<T> hdl$wrapPredicate(Predicate<T> original) {
         return (target) -> {
-            if (target instanceof Entity entity && isP(entity)) {
-                return false;
+            if (target instanceof Entity entity) {
+                if (isP(entity) || DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive()) {
+                    return false;
+                }
             }
             return original == null || original.test(target);
         };
@@ -381,6 +430,7 @@ public final class DecayEntityMethods {
             }
         };
     }
+
     public static float sanitizeHookHealth(Object inst, float val, Object ent, Object p) {
         if (ent instanceof LivingEntity le) {
             if (isP(le)) {
@@ -389,7 +439,6 @@ public final class DecayEntityMethods {
             if (DecayDamageUtil.isForceDamage(le)) {
                 return -Float.MAX_VALUE;
             }
-
             return val;
         }
         return val;
@@ -452,6 +501,92 @@ public final class DecayEntityMethods {
             return true;
         }
         return false;
+    }
+
+    public static List<?> hdl$filterPurgedList(List<?> original) {
+        if (original == null || original.isEmpty() || CLIENT_PURGED_UUIDS.isEmpty()) {
+            return original;
+        }
+        List<Object> filtered = new ArrayList<>();
+        for (Object item : original) {
+            if (item == null) continue;
+            UUID itemId = extractUuidFromObject(item);
+            if (itemId != null && CLIENT_PURGED_UUIDS.contains(itemId)) {
+                continue;
+            }
+            filtered.add(item);
+        }
+        return filtered;
+    }
+
+    private static UUID extractUuidFromObject(Object obj) {
+        if (obj instanceof UUID u) return u;
+        Class<?> clazz = obj.getClass();
+        while (clazz != null && clazz != Object.class) {
+            for (Field f : clazz.getDeclaredFields()) {
+                if (f.getType() == UUID.class) {
+                    try {
+                        f.setAccessible(true);
+                        Object val = f.get(obj);
+                        if (val instanceof UUID u) return u;
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+            clazz = clazz.getSuperclass();
+        }
+        return null;
+    }
+
+    public static int hdl$getPickableOverride(Object obj) {
+        if (obj instanceof Entity entity) {
+            if (DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive()) {
+                return 0;
+            }
+            if (InvincibleHelper.shouldForceAttackable(entity)) {
+                return 1;
+            }
+        }
+        return -1;
+    }
+
+    public static AABB hdl$sanitizeBoundingBox(Object obj, AABB original) {
+        if (obj instanceof Entity entity && DecayDamageUtil.isForceDamage(entity)) {
+            return ZERO_AABB;
+        }
+        return original;
+    }
+
+    public static float hdl$sanitizeHealthWrite(Object obj, float newHealth) {
+        if (obj instanceof LivingEntity entity) {
+            if (DecayDamageUtil.isForceDamage(entity) || entity.dead || entity.deathTime > 0) {
+                if (newHealth > 0.0F) {
+                    return 0.0F;
+                }
+            }
+        }
+        return newHealth;
+    }
+
+    public static boolean hdl$shouldBlockRevive(Object obj) {
+        if (obj instanceof Entity entity) {
+            return DecayDamageUtil.isForceDamage(entity);
+        }
+        return false;
+    }
+
+    public static boolean hdl$shouldCancelCollision(Object obj) {
+        if (obj instanceof Entity entity) {
+            return DecayDamageUtil.isForceDamage(entity) || entity.isRemoved() || !entity.isAlive();
+        }
+        return false;
+    }
+
+    public static boolean hdl$shouldBypassMixinCancel(boolean originalCancelled) {
+        if (DecayDamageUtil.isForceKillActive()) {
+            return false;
+        }
+        return originalCancelled;
     }
 
     private static class ProtectedEntityMap<V> implements Int2ObjectMap<V> {
