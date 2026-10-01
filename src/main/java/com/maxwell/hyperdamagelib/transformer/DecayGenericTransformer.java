@@ -376,44 +376,7 @@ public final class DecayGenericTransformer implements Opcodes {
                     }
                 }
                 if (!(insn instanceof MethodInsnNode mi)) continue;
-                if ((mi.getOpcode() == INVOKEVIRTUAL || mi.getOpcode() == INVOKEINTERFACE) && isTargetEntity(mi.owner)) {
-                    if ((mi.name.equals("getHealth") || mi.name.equals("m_21223_")) && mi.desc.equals("()F")) {
-                        mi.setOpcode(INVOKESTATIC);
-                        mi.owner = METHODS;
-                        mi.name = "hdl$getHealth";
-                        mi.desc = "(Ljava/lang/Object;)F";
-                        mi.itf = false;
-                        modified = true;
-                    } else if ((mi.name.equals("isDeadOrDying") || mi.name.equals("m_21224_")) && mi.desc.equals("()Z")) {
-                        mi.setOpcode(INVOKESTATIC);
-                        mi.owner = METHODS;
-                        mi.name = "hdl$isDeadOrDying";
-                        mi.desc = "(Ljava/lang/Object;)Z";
-                        mi.itf = false;
-                        modified = true;
-                    } else if ((mi.name.equals("isAlive") || mi.name.equals("m_6084_")) && mi.desc.equals("()Z")) {
-                        mi.setOpcode(INVOKESTATIC);
-                        mi.owner = METHODS;
-                        mi.name = "hdl$isAlive";
-                        mi.desc = "(Ljava/lang/Object;)Z";
-                        mi.itf = false;
-                        modified = true;
-                    } else if ((mi.name.equals("isRemoved") || mi.name.equals("m_213877_") || mi.name.equals("m_240725_")) && mi.desc.equals("()Z")) {
-                        mi.setOpcode(INVOKESTATIC);
-                        mi.owner = METHODS;
-                        mi.name = "hdl$isRemoved";
-                        mi.desc = "(Ljava/lang/Object;)Z";
-                        mi.itf = false;
-                        modified = true;
-                    } else if (mi.name.equals("exists") && mi.desc.equals("()Z")) {
-                        mi.setOpcode(INVOKESTATIC);
-                        mi.owner = METHODS;
-                        mi.name = "hdl$exists";
-                        mi.desc = "(Ljava/lang/Object;)Z";
-                        mi.itf = false;
-                        modified = true;
-                    }
-                } else if (mi.getOpcode() == INVOKEINTERFACE && !isSys(mi.owner)) {
+                if (mi.getOpcode() == INVOKEINTERFACE && !isSys(mi.owner)) {
                     String d = mi.desc;
                     if (d.startsWith("(FLjava/lang/Object;") && d.endsWith(")F")) {
                         mi.setOpcode(INVOKESTATIC);
