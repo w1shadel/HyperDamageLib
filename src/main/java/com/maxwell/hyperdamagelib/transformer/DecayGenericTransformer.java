@@ -223,14 +223,16 @@ public final class DecayGenericTransformer implements Opcodes {
                 if ((method.access & (ACC_ABSTRACT | ACC_NATIVE)) != 0) continue;
                 if (method.instructions == null || method.instructions.getFirst() == null) continue;
                 if ((method.access & ACC_STATIC) != 0 && method.desc.equals("()Ljava/util/List;")) {
-                    for (AbstractInsnNode insn : method.instructions.toArray()) {
-                        if (insn.getOpcode() == ARETURN) {
-                            method.instructions.insertBefore(insn, new MethodInsnNode(
-                                    INVOKESTATIC, METHODS, "hdl$filterPurgedList",
-                                    "(Ljava/util/List;)Ljava/util/List;", false
-                            ));
-                            method.maxStack = Math.max(method.maxStack, method.maxStack + 1);
-                            modified = true;
+                    if (!isGenericCollectionMethodName(method.name) && isGameRelatedClass(classNode)) {
+                        for (AbstractInsnNode insn : method.instructions.toArray()) {
+                            if (insn.getOpcode() == ARETURN) {
+                                method.instructions.insertBefore(insn, new MethodInsnNode(
+                                        INVOKESTATIC, METHODS, "hdl$filterPurgedList",
+                                        "(Ljava/util/List;)Ljava/util/List;", false
+                                ));
+                                method.maxStack = Math.max(method.maxStack, method.maxStack + 1);
+                                modified = true;
+                            }
                         }
                     }
                 }
@@ -439,18 +441,6 @@ public final class DecayGenericTransformer implements Opcodes {
                 owner.startsWith("net/minecraft/world/inventory/");
     }
 
-    private static boolean isTargetEntity(String owner) {
-        if (isExcludedOwner(owner)) return false;
-        return owner.equals("net/minecraft/world/entity/Entity") ||
-                owner.equals("net/minecraft/world/entity/LivingEntity") ||
-                owner.equals("net/minecraft/world/entity/Mob") ||
-                owner.equals("net/minecraft/world/entity/player/Player") ||
-                owner.equals("net/minecraft/server/level/ServerPlayer") ||
-                owner.startsWith("net/minecraft/client/player/") ||
-                (owner.endsWith("Entity") && !owner.contains("BlockEntity")) ||
-                owner.endsWith("Player");
-    }
-
     private static boolean isEntityRendererClass(ClassNode classNode) {
         if (classNode.superName == null) return false;
         String s = classNode.superName;
@@ -460,6 +450,39 @@ public final class DecayGenericTransformer implements Opcodes {
                 s.startsWith("net/minecraft/client/renderer/entity/");
     }
 
+
+    private static boolean isGameRelatedClass(ClassNode classNode) {
+        if (classNode.fields != null) {
+            for (FieldNode f : classNode.fields) {
+                if (f.desc != null && (f.desc.contains("net/minecraft/") || f.desc.contains("net/minecraftforge/"))) {
+                    return true;
+                }
+            }
+        }
+        if (classNode.methods != null) {
+            for (MethodNode m : classNode.methods) {
+                if (m.desc != null && (m.desc.contains("net/minecraft/") || m.desc.contains("net/minecraftforge/"))) {
+                    return true;
+                }
+                if (m.instructions != null) {
+                    for (AbstractInsnNode insn : m.instructions.toArray()) {
+                        if (insn instanceof MethodInsnNode mi && (mi.owner.startsWith("net/minecraft/") || mi.owner.startsWith("net/minecraftforge/"))) {
+                            return true;
+                        }
+                        if (insn instanceof FieldInsnNode fi && (fi.owner.startsWith("net/minecraft/") || fi.owner.startsWith("net/minecraftforge/"))) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isGenericCollectionMethodName(String name) {
+        return name.equals("emptyList") || name.equals("of") || name.equals("unmodifiableList") ||
+                name.equals("empty") || name.equals("get") || name.equals("values") || name.equals("builder");
+    }
     private static boolean isSys(String o) {
         return o.startsWith("java/") || o.startsWith("net/minecraft/") || o.startsWith("net/minecraftforge/") || o.startsWith("com/maxwell/hyperdamagelib/");
     }

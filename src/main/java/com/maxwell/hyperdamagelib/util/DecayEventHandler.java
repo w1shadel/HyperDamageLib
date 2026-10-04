@@ -212,9 +212,33 @@ public class DecayEventHandler {
                         .then(Commands.literal("forceDamage")
                                 .then(Commands.argument("targets", EntityArgument.entities())
                                         .then(Commands.argument("amount", FloatArgumentType.floatArg(0.0F))
-                                                .executes(ctx -> forceDamage(ctx.getSource(), EntityArgument.getEntities(ctx, "targets"), FloatArgumentType.getFloat(ctx, "amount"), null))
-                                                .then(Commands.argument("attacker", EntityArgument.entity())
-                                                        .executes(ctx -> forceDamage(ctx.getSource(), EntityArgument.getEntities(ctx, "targets"), FloatArgumentType.getFloat(ctx, "amount"), EntityArgument.getEntity(ctx, "attacker")))
+
+                                                .executes(ctx -> forceDamage(
+                                                        ctx.getSource(),
+                                                        EntityArgument.getEntities(ctx, "targets"),
+                                                        FloatArgumentType.getFloat(ctx, "amount"),
+                                                        null,
+                                                        false
+                                                ))
+
+                                                .then(Commands.argument("isForcekill", BoolArgumentType.bool())
+                                                        .executes(ctx -> forceDamage(
+                                                                ctx.getSource(),
+                                                                EntityArgument.getEntities(ctx, "targets"),
+                                                                FloatArgumentType.getFloat(ctx, "amount"),
+                                                                null,
+                                                                BoolArgumentType.getBool(ctx, "isForcekill")
+                                                        ))
+
+                                                        .then(Commands.argument("attacker", EntityArgument.entity())
+                                                                .executes(ctx -> forceDamage(
+                                                                        ctx.getSource(),
+                                                                        EntityArgument.getEntities(ctx, "targets"),
+                                                                        FloatArgumentType.getFloat(ctx, "amount"),
+                                                                        EntityArgument.getEntity(ctx, "attacker"),
+                                                                        BoolArgumentType.getBool(ctx, "isForcekill")
+                                                                ))
+                                                        )
                                                 )
                                         )
                                 )
@@ -282,13 +306,13 @@ public class DecayEventHandler {
         );
     }
 
-    private static int forceDamage(CommandSourceStack source, Collection<? extends Entity> targets, float amount, @Nullable Entity attacker) {
+    private static int forceDamage(CommandSourceStack source, Collection<? extends Entity> targets, float amount, @Nullable Entity attacker, boolean isForcekill) {
         int count = 0;
         for (Entity entity : targets) {
             if (entity instanceof LivingEntity living) {
                 try (var ignored = DecayDamageUtil.forceKillScope(living)) {
                     DamageSource damageSource = DecayDamageUtil.getErosionSource(living.level(), attacker);
-                    DecayDamageUtil.applyCustomDamage(living, damageSource, amount);
+                    DecayDamageUtil.applyCustomDamage(living, damageSource, amount, isForcekill);
                     count++;
                 } catch (Exception e) {
                     throw new RuntimeException(e);

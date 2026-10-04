@@ -31,7 +31,11 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.forgespi.language.IModFileInfo;
+import net.minecraftforge.forgespi.language.ModFileScanData;
+import net.minecraftforge.forgespi.locating.IModFile;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
@@ -66,90 +70,65 @@ public class DecayForceKillHelper {
             executePlayerKillHierarchy(serverPlayer, source);
             return;
         }
+
         DecayDamageUtil.markPermanentlyKilled(entity);
         try (var ignored1 = DecayDamageUtil.forceKillScope(entity)) {
+
             Class<?> entityClass = entity.getClass();
             String className = entityClass.getName();
             boolean isCustomModEntity = isCustomModClass(className);
+
             Set<UUID> targetUuids = isCustomModEntity ? extractAllLinkedUuids(entity) : Collections.singleton(entity.getUUID());
             ClassLoader targetLoader = entityClass.getClassLoader();
             Package targetPkg = entityClass.getPackage();
             String pkgPrefix = isCustomModEntity && targetPkg != null ? getDomainRootPackage(targetPkg.getName()) : "";
+
             if (isCustomModEntity) {
                 if (entity.level() instanceof ServerLevel serverLevel) {
                     MinecraftServer server = serverLevel.getServer();
+
                     PurgedEntitiesSavedData.get(serverLevel).markPurged(entity);
                     for (UUID u : targetUuids) {
                         PurgedEntitiesSavedData.get(serverLevel).markPurged(u);
                     }
+
                     if (!pkgPrefix.isEmpty()) {
                         purgeSavedDataGeneric(server, targetUuids, targetLoader, pkgPrefix);
                     }
                 }
             }
-            try {
-                purgeBossBars(entity, entity.level());
-            } catch (Throwable ignored) {
-            }
-            try {
-                cascadeKillLinkedEntities(entity, source, targetUuids);
-            } catch (Throwable ignored) {
-            }
+
+            try { purgeBossBars(entity, entity.level()); } catch (Throwable ignored) {}
+            try { cascadeKillLinkedEntities(entity, source, targetUuids); } catch (Throwable ignored) {}
+
             try (var ignored2 = DecayDamageUtil.bypassScope(entity)) {
                 entity.setHealth(0.0F);
                 try {
                     entity.getEntityData().set(LivingEntityAccessor.getDataHealthId(), 0.0F);
-                } catch (Throwable ignored) {
-                }
-            } catch (Throwable ignored) {
-            }
-            try {
-                collapseBoundingBoxAndDimensions(entity);
-            } catch (Throwable ignored) {
-            }
-            try {
-                entity.die(source);
-            } catch (Throwable ignored) {
-            }
-            try {
-                dropAllForce(entity);
-            } catch (Throwable ignored) {
-            }
-            try {
-                setRemovalStateDirect(entity);
-                entity.discard();
-                if (entity.level() instanceof ServerLevel serverLevel) {
-                    ClientboundRemoveEntitiesPacket removePacket = new ClientboundRemoveEntitiesPacket(entity.getId());
-                    for (ServerPlayer player : serverLevel.getServer().getPlayerList().getPlayers()) {
-                        if (player.connection != null) {
-                            player.connection.send(removePacket);
-                        }
+                } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+
+            try { collapseBoundingBoxAndDimensions(entity); } catch (Throwable ignored) {}
+            try { entity.die(source); } catch (Throwable ignored) {}
+            try { dropAllForce(entity); } catch (Throwable ignored) {}
+
+            if (entity.level() instanceof ServerLevel serverLevel) {
+                for (Entity e : serverLevel.getAllEntities()) {
+                    if (e != null && e.getClass() == entityClass && !(e instanceof Player)) {
+                        setRemovalStateDirect(e);
+                        e.discard();
+                        serverLevel.getChunkSource().removeEntity(e);
+                        serverLevel.entityTickList.remove(e);
                     }
                 }
-            } catch (Throwable ignored) {
             }
-            try {
-                removeFromMemory(entity);
-            } catch (Throwable ignored) {
-            }
-            try {
-                breakControllers(entity);
-            } catch (Throwable ignored) {
-            }
+
             if (isCustomModEntity) {
-                try {
-                    purgeStaticDataInDomain(entityClass, targetUuids, targetLoader, pkgPrefix);
-                } catch (Throwable ignored) {
-                }
-                try {
-                    purgeFromExternalLists(entity);
-                } catch (Throwable ignored) {
-                }
+                try { purgeStaticDataInDomain(entityClass, targetUuids, targetLoader, pkgPrefix); } catch (Throwable ignored) {}
+                try { purgeFromExternalLists(entity); } catch (Throwable ignored) {}
             }
-            try {
-                wipeEntireEntityState(entity);
-            } catch (Throwable ignored) {
-            }
+
+            try { wipeEntireEntityState(entity); } catch (Throwable ignored) {}
 
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -183,6 +162,7 @@ public class DecayForceKillHelper {
 
     public static void purgeSavedDataGeneric(MinecraftServer server, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix) {
         if (server == null || pkgPrefix.isEmpty()) return;
+
         for (ServerLevel level : server.getAllLevels()) {
             try {
                 DimensionDataStorage storage = level.getDataStorage();
@@ -191,6 +171,7 @@ public class DecayForceKillHelper {
                 cacheField.setAccessible(true);
                 Map<?, ?> cache = (Map<?, ?>) cacheField.get(storage);
                 if (cache == null) continue;
+
                 for (Object savedDataObj : cache.values()) {
                     if (savedDataObj == null) continue;
                     boolean modified = purgeMapsAndCollectionsInObject(savedDataObj, targetUuids, loader, pkgPrefix, server);
@@ -198,11 +179,53 @@ public class DecayForceKillHelper {
                         sd.setDirty();
                     }
                 }
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {}
+        }
+
+        Set<Class<?>> domainClasses = new HashSet<>();
+        collectReferencedDomainClasses(loader != null ? Object.class : null, domainClasses, pkgPrefix);
+
+        for (IModFileInfo fileInfo : ModList.get().getModFiles()) {
+            IModFile modFile = fileInfo.getFile();
+            if (modFile == null) continue;
+            try {
+                ModFileScanData scanData = modFile.getScanResult();
+                if (scanData != null && scanData.getClasses() != null) {
+                    for (ModFileScanData.ClassData cd : scanData.getClasses()) {
+                        String cname = cd.clazz().getClassName();
+                        if (cname.startsWith(pkgPrefix)) {
+                            tryDirectDomainDataPurge(cname, server, targetUuids, loader, pkgPrefix);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
         }
     }
+    private static void tryDirectDomainDataPurge(String className, MinecraftServer server, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix) {
+        try {
+            Class<?> clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
+            for (Method m : clazz.getDeclaredMethods()) {
+                if (!Modifier.isStatic(m.getModifiers())) continue;
+                Class<?>[] params = m.getParameterTypes();
 
+                Object dataObj = null;
+                if (params.length == 1 && params[0] == MinecraftServer.class) {
+                    m.setAccessible(true);
+                    dataObj = m.invoke(null, server);
+                } else if (params.length == 1 && params[0] == ServerLevel.class) {
+                    m.setAccessible(true);
+                    dataObj = m.invoke(null, server.overworld());
+                }
+
+                if (dataObj != null) {
+                    boolean modified = purgeMapsAndCollectionsInObject(dataObj, targetUuids, loader, pkgPrefix, server);
+                    if (modified && dataObj instanceof net.minecraft.world.level.saveddata.SavedData sd) {
+                        sd.setDirty();
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+    }
     private static boolean purgeMapsAndCollectionsInObject(Object target, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix, MinecraftServer server) {
         if (target == null || pkgPrefix.isEmpty()) return false;
         boolean modified = false;
@@ -252,31 +275,42 @@ public class DecayForceKillHelper {
     }
 
     public static void purgeStaticDataInDomain(Class<?> startClass, Set<UUID> targetUuids, ClassLoader loader, String pkgPrefix) {
-        if (startClass == null || pkgPrefix.isEmpty()) return;
-        Set<Class<?>> scannedClasses = new HashSet<>();
-        collectReferencedDomainClasses(startClass, scannedClasses, pkgPrefix);
-        for (Class<?> clazz : scannedClasses) {
+        if (pkgPrefix == null || pkgPrefix.isEmpty()) return;
+
+        for (IModFileInfo fileInfo : ModList.get().getModFiles()) {
+            IModFile modFile = fileInfo.getFile();
+            if (modFile == null) continue;
+            try {
+                ModFileScanData scanData = modFile.getScanResult();
+                if (scanData != null && scanData.getClasses() != null) {
+                    for (ModFileScanData.ClassData cd : scanData.getClasses()) {
+                        String cname = cd.clazz().getClassName();
+                        if (cname.startsWith(pkgPrefix)) {
+                            wipeStaticMapsInClass(cname, targetUuids, pkgPrefix);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+    private static void wipeStaticMapsInClass(String className, Set<UUID> targetUuids, String pkgPrefix) {
+        try {
+            Class<?> clazz = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
             for (Field f : clazz.getDeclaredFields()) {
                 if (!Modifier.isStatic(f.getModifiers())) continue;
                 try {
                     f.setAccessible(true);
                     Object staticObj = f.get(null);
+
                     if (staticObj instanceof Map<?, ?> map) {
-                        map.entrySet().removeIf(e ->
-                                targetUuids.contains(e.getKey()) ||
-                                        targetUuids.contains(e.getValue()) ||
-                                        (e.getValue() != null && e.getValue().getClass().getClassLoader() == loader &&
-                                                e.getValue().getClass().getName().startsWith(pkgPrefix))
-                        );
+                        map.clear();
                     } else if (staticObj instanceof Collection<?> col) {
                         forceWipeArrayList(col);
                     }
-                } catch (Throwable ignored) {
-                }
+                } catch (Throwable ignored) {}
             }
-        }
+        } catch (Throwable ignored) {}
     }
-
     private static void collectReferencedDomainClasses(Class<?> targetClass, Set<Class<?>> scanned, String pkgPrefix) {
         if (targetClass == null || scanned.contains(targetClass)) return;
         if (!targetClass.getName().startsWith(pkgPrefix)) return;
@@ -612,39 +646,47 @@ public class DecayForceKillHelper {
         if (victim == null) return;
         Level level = victim.level();
         if (level instanceof ServerLevel serverLevel) {
-            ClientboundRemoveEntitiesPacket removePacket =
-                    new ClientboundRemoveEntitiesPacket(victim.getId());
+
+            ClientboundRemoveEntitiesPacket removePacket = new ClientboundRemoveEntitiesPacket(victim.getId());
             serverLevel.getChunkSource().chunkMap.broadcast(victim, removePacket);
             serverLevel.getChunkSource().chunkMap.removeEntity(victim);
-            victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
-            victim.levelCallback = EntityInLevelCallback.NULL;
-            PersistentEntitySectionManager<Entity> manager = serverLevel.entityManager;
-            EntitySectionStorage<Entity> sectionStorage = manager.sectionStorage;
-            if (manager.isLoaded(victim.getUUID())) {
-                long index = SectionPos.of(victim.blockPosition()).asLong();
-                EntitySection<Entity> tSection = sectionStorage.getSection(index);
-                if (Objects.nonNull(tSection)) {
-                    EntitySection<Entity> newSection = new EntitySection<>(Entity.class, tSection.getStatus());
-                    tSection.getEntities().filter(entity -> victim != entity).forEach(newSection::add);
-                    sectionStorage.sections.replace(index, newSection);
+
+            try {
+                victim.levelCallback.onRemove(Entity.RemovalReason.KILLED);
+            } catch (Throwable ignored) {}
+
+            try {
+                PersistentEntitySectionManager<Entity> manager = serverLevel.entityManager;
+                if (manager != null) {
+
+                    if (manager.visibleEntityStorage != null) {
+                        manager.visibleEntityStorage.remove(victim);
+                    }
+
+                    EntitySectionStorage<Entity> sectionStorage = manager.sectionStorage;
+                    if (sectionStorage != null && sectionStorage.sections != null) {
+                        sectionStorage.sections.values().forEach(section -> {
+                            if (section != null) {
+                                try {
+
+                                    Method removeMethod = section.getClass().getDeclaredMethod("remove", Object.class);
+                                    removeMethod.setAccessible(true);
+                                    removeMethod.invoke(section, victim);
+                                } catch (Throwable ignored2) {}
+                            }
+                        });
+                    }
+
+                    if (manager.knownUuids != null) {
+                        manager.knownUuids.remove(victim.getUUID());
+                    }
                 }
-                manager.knownUuids.remove(victim.getUUID());
-            }
-            EntityLookup<Entity> entityLookup = manager.visibleEntityStorage;
-            entityLookup.remove(victim);
-            if (entityLookup.getEntity(victim.getId()) != null) {
-                EntityLookup<Entity> newEntityLookup = new EntityLookup<>();
-                for (Entity entity : entityLookup.getAllEntities()) {
-                    if (entity != victim) newEntityLookup.add(entity);
-                }
-                manager.visibleEntityStorage = newEntityLookup;
-                manager.entityGetter = new LevelEntityGetterAdapter<>(newEntityLookup, sectionStorage);
-            }
+            } catch (Throwable ignored) {}
+
             serverLevel.entityTickList.remove(victim);
             serverLevel.getChunkSource().removeEntity(victim);
         }
     }
-
     private static Field getField(Class<?> clazz, String srgName, String mcpName) {
         try {
             return clazz.getDeclaredField(srgName);
